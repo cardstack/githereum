@@ -1,0 +1,46 @@
+{
+  "name": "githereum",
+  "version": "0.0.1",
+  "description": "",
+  "scripts": {
+    "build": "rm -rf build && npm run build:zos",
+    "build:zos": "zos add githereum",
+    "test": "npm run lint && npm run-script build && truffle test --network=development",
+    "lint": "npm run lint:mocha && npm run lint:sol && npm run lint:js",
+    "lint:sol": "solhint 'contracts/**/*.sol' 'test/**/*.sol'",
+    "lint:js": "eslint . --cache --ignore-path .gitignore --ext=js",
+    "lint:mocha": "if [ -z \"`grep -r 'it.only(' ./test`\" ] && [ -z \"`grep -r 'contract.only(' ./test`\" ] && [ -z \"`grep -r 'describe.only(' ./test`\" ] && [ -z \"`grep -r \\\"describe.skip('oraclize live tests\\\" ./test`\" ]; then exit 0; else echo '\"it.only\" or \"describe.only\" or it looks like you are skipping the oraclize live tests in the mocha tests! You are not testing everything.' && exit 1; fi"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cardstack/githereum.git"
+  },
+  "author": "Alex Speller",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/cardstack/githereum/issues"
+  },
+  "homepage": "https://github.com/cardstack/githereum#readme",
+  "devDependencies": {
+    "chai": "^4.2.0",
+    "chai-as-promised": "^7.1.1",
+    "command-line-args": "^5.1.1",
+    "command-line-usage": "^5.0.5",
+    "eslint": "^5.16.0",
+    "ganache-cli": "^6.5.0",
+    "moment": "^2.24.0",
+    "openzeppelin-eth": "^2.2.0",
+    "openzeppelin-solidity": "^2.3.0",
+    "openzeppelin-test-helpers": "^0.4.0",
+    "scrypt": "^6.0.3",
+    "solc": "0.5.10",
+    "solhint": "protofire/solhint#4ad944451dfb4caf8001f0040293f9521d8c0aa6",
+    "truffle": "^5.0.28",
+    "web3": "1.0.0-beta.55",
+    "zos": "^2.4.2",
+    "zos-lib": "^2.4.1"
+  },
+  "dependencies": {
+    "lodash": "^4.17.11"
+  }
+}

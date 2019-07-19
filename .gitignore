@@ -1,0 +1,24 @@
+# compiled output
+/dist
+/tmp
+# unsure about this one...
+/build
+
+# dependencies
+/node_modules
+
+# misc
+npm-debug.log
+testem.log
+.DS_Store
+.node-*
+accounts.txt
+*.csv
+*.numbers
+*.log
+*_bak
+
+.zos.session
+zos.*.json
+
+.eslintcache
