@@ -1,0 +1,14 @@
+---
+language: node_js
+
+node_js:
+  - "10.16"
+
+cache: npm
+
+install:
+  - npm install
+  - ganache-cli -p 9545 -m 'primary category before chat clump require shove select involve topic virus accident' > /dev/null 2>&1 &
+
+script:
+  - npm test

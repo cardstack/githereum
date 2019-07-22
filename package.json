@@ -25,6 +25,7 @@
   "dependencies": {
     "chai": "^4.2.0",
     "chai-as-promised": "^7.1.1",
+    "ganache-cli": "^6.5.0",
     "lodash": "^4.17.11",
     "openzeppelin-eth": "^2.2.0",
     "solc": "0.5.8",

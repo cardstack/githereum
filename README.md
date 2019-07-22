@@ -1,5 +1,7 @@
 # Githereum
 
+[![Build Status](https://travis-ci.com/cardstack/githereum.svg?token=icdHtyWxYqeLi6vwJoV4&branch=master)](https://travis-ci.com/cardstack/githereum)
+
 Gitchain implementation in ethereum
 
 ## Installation
