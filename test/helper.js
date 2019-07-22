@@ -1,5 +1,5 @@
 const chai = require('chai');
-const truffleContract = require("truffle-contract");
+
 const {
   NULL_ADDRESS,
   NULL_ADDRESS_REGEX,
@@ -26,15 +26,6 @@ const assertMinBalance = async (address, minBalanceEth=1) => {
   }
 };
 
-const truffleContractFromWeb3Contract = contract => {
-  let _contract = truffleContract({
-    abi: contract._jsonInterface,
-    address: contract.address
-  });
-  _contract.setProvider(web3.currentProvider);
-  return _contract;
-};
-
 async function truffleExec(scriptPath, argv="") {
   const script = require(`../scripts/${scriptPath}`);
 
@@ -55,7 +46,6 @@ module.exports = {
   travisHeartbeat,
   waitForEvent,
   assertMinBalance,
-  truffleContractFromWeb3Contract,
   NULL_BYTES32,
   NULL_ADDRESS,
   NULL_ADDRESS_REGEX,

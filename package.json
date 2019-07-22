@@ -2,9 +2,10 @@
   "name": "githereum",
   "version": "0.0.1",
   "description": "",
+  "main": "index.js",
   "scripts": {
     "build": "rm -rf build && npm run build:zos",
-    "build:zos": "zos add githereum",
+    "build:zos": "zos add Githereum",
     "test": "npm run lint && npm run-script build && truffle test --network=development",
     "lint": "npm run lint:mocha && npm run lint:sol && npm run lint:js",
     "lint:sol": "solhint 'contracts/**/*.sol' 'test/**/*.sol'",
@@ -15,32 +16,21 @@
     "type": "git",
     "url": "git+https://github.com/cardstack/githereum.git"
   },
-  "author": "Alex Speller",
+  "author": "",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/cardstack/githereum/issues"
   },
-  "homepage": "https://github.com/cardstack/githereum#readme",
-  "devDependencies": {
+  "keywords": [],
+  "dependencies": {
     "chai": "^4.2.0",
     "chai-as-promised": "^7.1.1",
-    "command-line-args": "^5.1.1",
-    "command-line-usage": "^5.0.5",
-    "eslint": "^5.16.0",
-    "ganache-cli": "^6.5.0",
-    "moment": "^2.24.0",
+    "lodash": "^4.17.11",
     "openzeppelin-eth": "^2.2.0",
-    "openzeppelin-solidity": "^2.3.0",
-    "openzeppelin-test-helpers": "^0.4.0",
-    "scrypt": "^6.0.3",
-    "solc": "0.5.10",
+    "solc": "0.5.8",
     "solhint": "protofire/solhint#4ad944451dfb4caf8001f0040293f9521d8c0aa6",
     "truffle": "^5.0.28",
-    "web3": "1.0.0-beta.55",
     "zos": "^2.4.2",
-    "zos-lib": "^2.4.1"
-  },
-  "dependencies": {
-    "lodash": "^4.17.11"
+    "zos-lib": "^2.4.2"
   }
 }
