@@ -1,10 +1,11 @@
 const chai = require('chai');
+const { shellCommand }  = require("../utils/async");
 
 const {
   NULL_ADDRESS,
   NULL_ADDRESS_REGEX,
   NULL_BYTES32
-} = require('../lib/constants');
+} = require('../utils/constants');
 chai.use(require("chai-as-promised"));
 
 const GAS_LIMIT = 200000;
@@ -26,20 +27,31 @@ const assertMinBalance = async (address, minBalanceEth=1) => {
   }
 };
 
-async function truffleExec(scriptPath, argv="") {
-  const script = require(`../scripts/${scriptPath}`);
+async function cli(commandStr) {
+  const script = require(`../cli`);
 
   let logs = [];
 
-  let logger = {
-    log(...args) {
-      logs.push(args.join(" "));
-    }
+  const log = function(...args) {
+    logs.push(args.join(" "));
   };
 
+  const argv = commandStr.split(/\s+/);
+
   return await new Promise ((resolve,reject) =>
-    script(err => err ? reject(err) : resolve(logs.join("\n")), { argv: argv.split(/\s+/), logger })
+    script(err => err ? reject(err) : resolve(logs.join("\n")), argv, log)
   );
+}
+
+async function setupFixtureRepo(repo) {
+  // can't store git repos in fixtures if git recognizes them as repos
+  await shellCommand(`cp -r test/fixtures/${repo} tmp/${repo}`);
+  await shellCommand(`mv tmp/${repo}/git tmp/${repo}/.git`);
+}
+
+async function setupBareFixtureRepo(repo) {
+  // can't store git repos in fixtures if git recognizes them as repos
+  await shellCommand(`cp -r test/fixtures/${repo}/git tmp/${repo}`);
 }
 
 module.exports = {
@@ -52,5 +64,7 @@ module.exports = {
   PREFIX,
   GAS_LIMIT,
   DEPLOY_GAS_LIMIT,
-  truffleExec
+  cli,
+  setupFixtureRepo,
+  setupBareFixtureRepo
 };

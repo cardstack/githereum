@@ -1,0 +1,6 @@
+0000000000000000000000000000000000000000 b5d928ed34f07b13cb2c664903b771b12ad2ca29 Alex Speller <alex@alexspeller.com> 1543412948 +0000	commit (initial): Initial commit
+b5d928ed34f07b13cb2c664903b771b12ad2ca29 23e65d5097a41c4f6f9b2937f807c78296ea3298 Alex Speller <alex@alexspeller.com> 1543412970 +0000	commit: Update README
+23e65d5097a41c4f6f9b2937f807c78296ea3298 247e877ae8a62139e3561fd95ac3cfa48cbfab97 Alex Speller <alex@alexspeller.com> 1543412983 +0000	commit: Add image
+247e877ae8a62139e3561fd95ac3cfa48cbfab97 a47c8dc067a1648896f7de6759d25411f8f665a0 Alex Speller <alex@alexspeller.com> 1543416318 +0000	commit: Add nested file
+a47c8dc067a1648896f7de6759d25411f8f665a0 54663b63174fc953678bea90602f1cf44d86dc15 Alex Speller <alex@alexspeller.com> 1548644489 +0000	commit: Make another conflicting change
+54663b63174fc953678bea90602f1cf44d86dc15 93ae4072e3660b23b30b80cfc98620dfbe20ca85 Alex Speller <alex@alexspeller.com> 1548644522 +0000	commit (merge): Merge branch 'conflicting-branch'
