@@ -11,6 +11,28 @@ To install this project locally, execute:
 2. `cd githereum`
 3. `npm install`
 
+
+## Usage
+
+After deploying the contract, this is how to use the CLI - `<contract>` is the
+address of the contract you deployed, `<path>` is the local path to your git repo,
+and `<tag>` is the name of the tag to push to or clone from
+
+```
+Githereum
+
+Usage:
+  npx truffle exec cli.js <contract> push --from <address> <path> <tag>
+  npx truffle exec cli.js <contract> clone <tag> <path>
+  npx truffle exec cli.js <contract> pull <tag> <path>
+  npx truffle exec cli.js <contract> head <tag>
+
+Options:
+  -f, --from <address>  Address of transaction sender
+  -h, --help            Show this screen
+  -v, --version         Show version
+```
+
 ## Testing
 1. From the command line execute: `npm run build`. This will clear the `build/` folder and re-generate the ZOS proxy contracts.
 2. Then run `truffle dev`. This spawns a private blockchain and displays the truffle console. Wait for the prompt to appear.
