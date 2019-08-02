@@ -17,7 +17,7 @@ const GithereumContract = Contracts.getFromLocal('Githereum');
 
 
 contract("Githereum", (addresses) => {
-  const [ owner ] = addresses;
+  const [ owner, repoOwner, someRandomAddress, otherOwner, ownerOfOtherRepo, writer ] = addresses;
 
   let githereumContract;
 
@@ -38,6 +38,94 @@ contract("Githereum", (addresses) => {
     this.project = await TestHelper();
     githereumContract = await this.project.createProxy(GithereumContract);
   });
+
+  describe.only("Roles", async function() {
+    this.slow(1000);
+
+    it("Registers a repo", async function() {
+      await runCli(`register --from ${repoOwner} my-great-repo`);
+
+      expect(await githereumContract.methods.isOwner("my-great-repo", repoOwner).call()).to.be.ok;
+      expect(await githereumContract.methods.isOwner("my-great-repo", owner).call()).to.not.be.ok;
+      expect(await githereumContract.methods.isOwner("my-great-repo", someRandomAddress).call()).to.not.be.ok;
+    });
+
+    it("Doesn't allow registering an existing repo", async function() {
+      await runCli(`register --from ${repoOwner} my-great-repo`);
+
+      expect(await githereumContract.methods.isOwner("my-great-repo", repoOwner).call()).to.be.ok;
+
+      let attemptedCreate = runCli(`register --from ${repoOwner} my-great-repo`);
+
+      await expect(attemptedCreate).to.be.rejectedWith(/Repo already exists/);
+    });
+
+    it("Repo owners can add new repo owners to a repo", async function() {
+      await runCli(`register --from ${repoOwner} my-great-repo`);
+
+      expect(await githereumContract.methods.isOwner("my-great-repo", otherOwner).call()).to.not.be.ok;
+
+      await runCli(`add owner --from ${repoOwner} my-great-repo ${otherOwner}`);
+
+      expect(await githereumContract.methods.isOwner("my-great-repo", repoOwner).call()).to.be.ok;
+      expect(await githereumContract.methods.isOwner("my-great-repo", otherOwner).call()).to.be.ok;
+
+    });
+
+    it("Repo owners cannot add new repo owners to a repo they do not own", async function() {
+      await runCli(`register --from ${repoOwner} my-great-repo`);
+      await runCli(`register --from ${ownerOfOtherRepo} other-repo`);
+
+      expect(await githereumContract.methods.isOwner("my-great-repo", ownerOfOtherRepo).call()).to.not.be.ok;
+      expect(await githereumContract.methods.isOwner("my-great-repo", someRandomAddress).call()).to.not.be.ok;
+
+      let attemptedAdd = runCli(`add owner --from ${ownerOfOtherRepo} my-great-repo ${someRandomAddress}`);
+      await expect(attemptedAdd).to.be.rejectedWith(/Only repo owners can add new owners/);
+
+      expect(await githereumContract.methods.isOwner("my-great-repo", ownerOfOtherRepo).call()).to.not.be.ok;
+      expect(await githereumContract.methods.isOwner("my-great-repo", someRandomAddress).call()).to.not.be.ok;
+
+    });
+
+    it("Repo owners can remove existing repo owners from a repo", async function() {
+      await runCli(`register --from ${repoOwner} my-great-repo`);
+      await runCli(`add owner --from ${repoOwner} my-great-repo ${otherOwner}`);
+
+      expect(await githereumContract.methods.isOwner("my-great-repo", repoOwner).call()).to.be.ok;
+      expect(await githereumContract.methods.isOwner("my-great-repo", otherOwner).call()).to.be.ok;
+
+      await runCli(`remove owner --from ${otherOwner} my-great-repo ${repoOwner}`);
+
+      expect(await githereumContract.methods.isOwner("my-great-repo", repoOwner).call()).to.not.be.ok;
+      expect(await githereumContract.methods.isOwner("my-great-repo", otherOwner).call()).to.be.ok;
+    });
+
+    it("Repo owners cannot remove existing repo owners from a repo they do not own", async function() {
+      await runCli(`register --from ${repoOwner} my-great-repo`);
+      await runCli(`register --from ${ownerOfOtherRepo} other-repo`);
+
+      expect(await githereumContract.methods.isOwner("my-great-repo", repoOwner).call()).to.be.ok;
+      expect(await githereumContract.methods.isOwner("my-great-repo", otherOwner).call()).to.be.ok;
+
+      await runCli(`remove owner --from ${otherOwner} my-great-repo ${repoOwner}`);
+
+      expect(await githereumContract.methods.isOwner("my-great-repo", repoOwner).call()).to.not.be.ok;
+      expect(await githereumContract.methods.isOwner("my-great-repo", otherOwner).call()).to.be.ok;
+    });
+    it.skip("Last owner cannot be removed from a repo");
+    it.skip("Repo owners can write to a repo they own");
+    it.skip("Repo owners cannot write to a repo they do not own");
+    it.skip("Repo owners can add writers to a repo");
+    it.skip("Repo owners cannot add writers to a repo they do not own");
+    it.skip("Writers can write to a repo they are writers of");
+    it.skip("Writers cannot write to a repo they are not writers of");
+    it.skip("Writers cannot add repo owners to a repo");
+    it.skip("Writers cannot add writers to a repo");
+    it.skip("Writers cannot remove repo owners from a repo");
+    it.skip("Writers cannot remove writers from a repo");
+    it.skip("Anyone can read from a repo");
+  });
+
 
   it("pushes a simple repo to the blockchain and restores it again", async() => {
     await setupFixtureRepo('dummygit');

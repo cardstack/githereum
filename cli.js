@@ -7,10 +7,13 @@ const help =
 `Githereum
 
 Usage:
+  githereum <contract> register --from <address> <repo>
   githereum <contract> push --from <address> <path> <tag>
   githereum <contract> clone <tag> <path>
   githereum <contract> pull <tag> <path>
   githereum <contract> head <tag>
+  githereum <contract> add owner --from <address> <repo> <owner>
+  githereum <contract> remove owner --from <address> <repo> <owner>
 
 Options:
   -f, --from <address>  Address of transaction sender
@@ -21,9 +24,22 @@ Options:
 let contractAddress, from, log;
 
 
+
+async function register(repo) {
+  await Githereum.register(repo, contractAddress, from, { log });
+}
+
 async function push(path, tag) {
   let githereum = new Githereum(path, contractAddress, from, { log });
   await githereum.push(tag);
+}
+
+async function addOwner(repo, owner) {
+  await Githereum.addOwner(repo, owner, contractAddress, from, { log });
+}
+
+async function removeOwner(repo, owner) {
+  await Githereum.removeOwner(repo, owner, contractAddress, from, { log });
 }
 
 async function clone(tag, path) {
@@ -62,6 +78,18 @@ module.exports = async function (done) {
     from = args['--from'];
 
     log(args);
+
+    if (args.register) {
+      await register(args['<repo>']);
+    }
+
+    if (args.add && args.owner) {
+      await addOwner(args['<repo>'], args['<owner>']);
+    }
+
+    if (args.remove && args.owner) {
+      await removeOwner(args['<repo>'], args['<owner>']);
+    }
 
     if (args.push) {
       await push(args['<path>'], args['<tag>']);

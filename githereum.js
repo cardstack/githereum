@@ -37,6 +37,40 @@ class Githereum {
     };
   }
 
+  static async register(repo, contractAddress, from, { log } = {}) {
+    log = log || defaultLogger;
+
+    log(`Registering repo ${repo}`);
+    let contract = await GithereumContract.at(contractAddress);
+
+    await contract.register(repo, { from });
+
+    log(`Registration successful`);
+  }
+
+
+  static async addOwner(repo, owner, contractAddress, from, { log } = {}) {
+    log = log || defaultLogger;
+
+    log(`Adding owner ${owner} to repo ${repo}`);
+    let contract = await GithereumContract.at(contractAddress);
+
+    await contract.addOwner(repo, owner, { from });
+
+    log(`Adding owner successful`);
+  }
+
+  static async removeOwner(repo, owner, contractAddress, from, { log } = {}) {
+    log = log || defaultLogger;
+
+    log(`Removing owner ${owner} from repo ${repo}`);
+    let contract = await GithereumContract.at(contractAddress);
+
+    await contract.removeOwner(repo, owner, { from });
+
+    log(`Removing owner successful`);
+  }
+
   static async head(tag, contractAddress, { log } = {}) {
     log = log || defaultLogger;
 
