@@ -8,12 +8,14 @@ const help =
 
 Usage:
   githereum <contract> register --from <address> <repo>
-  githereum <contract> push --from <address> <path> <tag>
-  githereum <contract> clone <tag> <path>
-  githereum <contract> pull <tag> <path>
-  githereum <contract> head <tag>
+  githereum <contract> push --from <address> <path> <repo:tag>
+  githereum <contract> clone <repo:tag> <path>
+  githereum <contract> pull <repo:tag> <path>
+  githereum <contract> head <repo:tag>
   githereum <contract> add owner --from <address> <repo> <owner>
   githereum <contract> remove owner --from <address> <repo> <owner>
+  githereum <contract> add writer --from <address> <repo> <writer>
+  githereum <contract> remove writer --from <address> <repo> <writer>
 
 Options:
   -f, --from <address>  Address of transaction sender
@@ -29,8 +31,8 @@ async function register(repo) {
   await Githereum.register(repo, contractAddress, from, { log });
 }
 
-async function push(path, tag) {
-  let githereum = new Githereum(path, contractAddress, from, { log });
+async function push(path, repoName, tag) {
+  let githereum = new Githereum(path, repoName, contractAddress, from, { log });
   await githereum.push(tag);
 }
 
@@ -42,18 +44,26 @@ async function removeOwner(repo, owner) {
   await Githereum.removeOwner(repo, owner, contractAddress, from, { log });
 }
 
-async function clone(tag, path) {
-  let githereum = new Githereum(path, contractAddress, from, { log });
+async function addWriter(repo, writer) {
+  await Githereum.addWriter(repo, writer, contractAddress, from, { log });
+}
+
+async function removeWriter(repo, writer) {
+  await Githereum.removeWriter(repo, writer, contractAddress, from, { log });
+}
+
+async function clone(repoName, tag, path) {
+  let githereum = new Githereum(path, repoName, contractAddress, from, { log });
   await githereum.clone(tag);
 }
 
-async function pull(tag, path) {
-  let githereum = new Githereum(path, contractAddress, from, { log });
+async function pull(repoName, tag, path) {
+  let githereum = new Githereum(path, repoName, contractAddress, from, { log });
   await githereum.pull(tag);
 }
 
-async function head(tag) {
-  await Githereum.head(tag, contractAddress, { log });
+async function head(repoName, tag) {
+  await Githereum.head(repoName, tag, contractAddress, { log });
 }
 
 module.exports = async function (done) {
@@ -91,20 +101,32 @@ module.exports = async function (done) {
       await removeOwner(args['<repo>'], args['<owner>']);
     }
 
+    if (args.add && args.writer) {
+      await addWriter(args['<repo>'], args['<writer>']);
+    }
+
+    if (args.remove && args.writer) {
+      await removeWriter(args['<repo>'], args['<writer>']);
+    }
+
     if (args.push) {
-      await push(args['<path>'], args['<tag>']);
+      let [repoName, tag] = args['<repo:tag>'].split(":");
+      await push(args['<path>'], repoName, tag);
     }
 
     if (args.clone) {
-      await clone(args['<tag>'], args['<path>']);
+      let [repoName, tag] = args['<repo:tag>'].split(":");
+      await clone(repoName, tag, args['<path>']);
     }
 
     if (args.pull) {
-      await pull(args['<tag>'], args['<path>']);
+      let [repoName, tag] = args['<repo:tag>'].split(":");
+      await pull(repoName, tag, args['<path>']);
     }
 
     if (args.head) {
-      await head(args['<tag>']);
+      let [repoName, tag] = args['<repo:tag>'].split(":");
+      await head(repoName, tag);
     }
   } catch(e) {
     done(e);

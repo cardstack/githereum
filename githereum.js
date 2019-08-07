@@ -11,7 +11,7 @@ const GithereumContract = artifacts.require('Githereum');
 
 
 class Githereum {
-  constructor(repoPath, contractAddress, from, { log, blobStorage }={}) {
+  constructor(repoPath, repoName, contractAddress, from, { log, blobStorage }={}) {
     if (!repoPath) {
       throw new Error("repoPath is a required argument");
     }
@@ -19,6 +19,11 @@ class Githereum {
       throw new Error("contractAddress is a required argument");
     }
 
+    if (!repoName) {
+      throw new Error("repoName is a required argument");
+    }
+
+    this.repoName = repoName;
     this.repoPath   = repoPath;
     this.gitDir     = join(this.repoPath, '.git');
     if(existsSync(repoPath) && !existsSync(this.gitDir)) {
@@ -39,6 +44,10 @@ class Githereum {
 
   static async register(repo, contractAddress, from, { log } = {}) {
     log = log || defaultLogger;
+
+    if (repo.includes(':')) {
+      throw new Error("Repo names cannot contain the : character");
+    }
 
     log(`Registering repo ${repo}`);
     let contract = await GithereumContract.at(contractAddress);
@@ -71,14 +80,35 @@ class Githereum {
     log(`Removing owner successful`);
   }
 
-  static async head(tag, contractAddress, { log } = {}) {
+  static async addWriter(repo, writer, contractAddress, from, { log } = {}) {
+    log = log || defaultLogger;
+
+    log(`Adding writer ${writer} to repo ${repo}`);
+    let contract = await GithereumContract.at(contractAddress);
+
+    await contract.addWriter(repo, writer, { from });
+
+    log(`Adding writer successful`);
+  }
+
+  static async removeWriter(repo, writer, contractAddress, from, { log } = {}) {
+    log = log || defaultLogger;
+
+    log(`Removing writer ${writer} from repo ${repo}`);
+    let contract = await GithereumContract.at(contractAddress);
+
+    await contract.removeWriter(repo, writer, { from });
+
+    log(`Removing writer successful`);
+  }
+
+  static async head(repoName, tag, contractAddress, { log } = {}) {
     log = log || defaultLogger;
 
     log(`Checking status of tag ${tag}`);
 
     let contract = await GithereumContract.at(contractAddress);
-    let push = await contract.pushes(tag);
-    let { headSha } = push;
+    let headSha = await contract.head(repoName, tag);
 
     log(`Sha of ${tag} is ${headSha}`);
 
@@ -102,8 +132,7 @@ class Githereum {
   async downloadPush(tag) {
     let contract = await this.contract();
 
-    let push = await contract.pushes(tag);
-    let { headSha } = push;
+    let headSha = await contract.head(this.repoName, tag);
 
     await this.downloadAllPackfiles(headSha);
 
@@ -114,11 +143,9 @@ class Githereum {
   async downloadAllPackfiles(sha) {
     let contract = await this.contract();
 
-    while (sha) {
+    while (sha && sha.length) {
 
-      let push = await contract.headShas(sha);
-
-      let { packSha } = push ;
+      let packSha = await contract.pack(this.repoName, sha);
 
       let packFile = await readFromBlobStream(packSha, this.blobStorageConfig);
 
@@ -128,7 +155,7 @@ class Githereum {
 
       await this.gitCommand('indexPack', { filepath: join('.git/objects/pack', packSha) });
 
-      sha = push.previousPushHeadSha;
+      sha = await contract.previousPushHeadSha(this.repoName, sha);
     }
 
   }
@@ -147,7 +174,7 @@ class Githereum {
 
   async writePushToBlockchain(commit, tag, packSha) {
     let meta = JSON.stringify(blobStoreMeta(this.blobStorageConfig));
-    await (await this.contract()).push(tag, commit.oid, packSha, meta, {from: this.from});
+    await (await this.contract()).push(this.repoName, tag, commit.oid, packSha, meta, {from: this.from});
   }
 
   async contract() {
@@ -160,10 +187,15 @@ class Githereum {
   }
 
   async push(tag) {
+
+    if(!tag || !tag.length) {
+      throw new Error("Tag must be provided to push to");
+    }
+
     let head;
 
     try {
-      head = await Githereum.head(tag, this.contractAddress, { log: this.log });
+      head = await Githereum.head(this.repoName, tag, this.contractAddress, { log: this.log });
     } catch(e) {
       // There is no head for this tag
     }
@@ -191,6 +223,10 @@ class Githereum {
   }
 
   async clone(tag) {
+    if(!tag || !tag.length) {
+      throw new Error("Tag must be provided to clone from");
+    }
+
     if (existsSync(this.repoPath)) {
       throw new Error(`Path ${this.repoPath} already exists!`);
     }
@@ -202,6 +238,10 @@ class Githereum {
   }
 
   async pull(tag) {
+    if(!tag || !tag.length) {
+      throw new Error("Tag must be provided to pull from");
+    }
+
     if (!existsSync(this.repoPath)) {
       throw new Error(`Path ${this.repoPath} doesn't exist!`);
     }
