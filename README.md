@@ -22,10 +22,15 @@ and `<tag>` is the name of the tag to push to or clone from
 Githereum
 
 Usage:
-  npx truffle exec cli.js <contract> push --from <address> <path> <tag>
-  npx truffle exec cli.js <contract> clone <tag> <path>
-  npx truffle exec cli.js <contract> pull <tag> <path>
-  npx truffle exec cli.js <contract> head <tag>
+  npx truffle exec cli.js <contract> register --from <address> <repo>
+  npx truffle exec cli.js <contract> push --from <address> <path> <repo:tag>
+  npx truffle exec cli.js <contract> clone <repo:tag> <path>
+  npx truffle exec cli.js <contract> pull <repo:tag> <path>
+  npx truffle exec cli.js <contract> head <repo:tag>
+  npx truffle exec cli.js <contract> add owner --from <address> <repo> <owner>
+  npx truffle exec cli.js <contract> remove owner --from <address> <repo> <owner>
+  npx truffle exec cli.js <contract> add writer --from <address> <repo> <writer>
+  npx truffle exec cli.js <contract> remove writer --from <address> <repo> <writer>
 
 Options:
   -f, --from <address>  Address of transaction sender
