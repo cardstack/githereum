@@ -2,7 +2,24 @@
 
 [![Build Status](https://travis-ci.com/cardstack/githereum.svg?token=icdHtyWxYqeLi6vwJoV4&branch=master)](https://travis-ci.com/cardstack/githereum)
 
-Githereum is a [Gitchain](https://github.com/gitchain/gitchain) implementation in [Ethereum](https://www.ethereum.org/). It allows you to create and manage decentralized git repositories.
+Githereum is a smart contract and set of tools that aim to be a distributed
+replacement for centralized repository hosting such as github or gitlab.
+
+It consists of an ethereum smart contract and a cli for interacting with it.
+
+The contract allows administring and sharing repos, the state of which is tracked
+on-chain allowing setting owners and writers, allowing distributed control of
+who has access to a repository along with cryptographically guaranteeing that
+different users have the same view of the state of the repo.
+
+Storage is off-chain, with a pluggable storage backend that supports S3, IPFS,
+google-drive [and more](https://www.npmjs.com/package/abstract-blob-store#some-modules-that-use-this)
+
+Distributing the repo content can be accomplished via any method including
+through offline distribution through the "sneakernet", allowing coordination of
+repository state even in scenarios where communication is unreliable or of low
+bandwidth
+
 
 ## Installation
 
