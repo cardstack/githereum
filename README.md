@@ -2,10 +2,12 @@
 
 [![Build Status](https://travis-ci.com/cardstack/githereum.svg?token=icdHtyWxYqeLi6vwJoV4&branch=master)](https://travis-ci.com/cardstack/githereum)
 
-Gitchain implementation in ethereum
+Githereum is a [Gitchain](https://github.com/gitchain/gitchain) implementation in [Ethereum](https://www.ethereum.org/). It allows you to create and manage decentralized git repositories.
 
 ## Installation
-We leverage ZOS for our smart contracts. ZOS really likes to use `npm`, so instead of trying to fight the system, we're using `npm` for this project instead of `yarn`.
+
+We recommend using `npm`, not yarn, to install this package. This package relies on ZOS ([OpenZeppelin](https://openzeppelin.com/sdk/)), which relies on `npm`.
+
 To install this project locally, execute:
 1. `git clone <repository url>`
 2. `cd githereum`
@@ -14,9 +16,11 @@ To install this project locally, execute:
 
 ## Usage
 
-After deploying the contract, this is how to use the CLI - `<contract>` is the
+After deploying the contract, this is how to use the CLI.
+
+In the examples below, `<contract>` is the
 address of the contract you deployed, `<path>` is the local path to your git repo,
-and `<tag>` is the name of the tag to push to or clone from
+and `<tag>` is the name of the tag to push to or clone from.
 
 ```
 Githereum
@@ -45,5 +49,5 @@ Options:
 
 You can just leave the truffle console running, and enter `test` from the truffle console in order to re-run your tests. Note that you should re-run `truffle build` (in a different terminal) anytime you make a modification to a ZOS contract's implementation in order to redeploy the proxy contract that wraps the implementation contract you modified.
 
-To get a debugger console, you can use `npx -n "--inspect-brk" truffle test` in a different terminal to run with the node debugger
+To get a debugger console, you can use `npx -n "--inspect-brk" truffle test` in a different terminal to run with the node debugger.
 
