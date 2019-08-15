@@ -3,7 +3,7 @@ const fs              = require('fs');
 const Git             = require('isomorphic-git');
 Git.plugins.set('fs', fs);
 
-const { writeToBlobStream, readFromBlobStream, blobStoreMeta }   = require('./utils/blob-storage');
+const { writeToBlobStream, readFromBlobStream, validateBlobStoreConfig }   = require('./utils/blob-storage');
 const { writeFileSync, existsSync }        = require('fs');
 const { join }             = require('path');
 
@@ -11,7 +11,7 @@ const GithereumContract = artifacts.require('Githereum');
 
 
 class Githereum {
-  constructor(repoPath, repoName, contractAddress, from, { log, blobStorage }={}) {
+  constructor(repoPath, repoName, contractAddress, from, { log }={}) {
     if (!repoPath) {
       throw new Error("repoPath is a required argument");
     }
@@ -35,14 +35,18 @@ class Githereum {
     this.from = from;
 
     this.log        = log || defaultLogger;
-
-    this.blobStorageConfig = blobStorage || {
-      type: 'tmpfile',
-      path: 'tmp/blobs'
-    };
   }
 
-  static async register(repo, contractAddress, from, { log } = {}) {
+  static async register(repo, contractAddress, from, { log, blobStorageConfig } = {}) {
+
+
+    this.blobStorageConfig = blobStorageConfig || {
+      type: 'file',
+      path: 'tmp/blobs'
+    };
+
+    validateBlobStoreConfig(this.blobStorageConfig);
+
     log = log || defaultLogger;
 
     if (repo.includes(':')) {
@@ -52,11 +56,10 @@ class Githereum {
     log(`Registering repo ${repo}`);
     let contract = await GithereumContract.at(contractAddress);
 
-    await contract.register(repo, { from });
+    await contract.register(repo, JSON.stringify(this.blobStorageConfig), { from });
 
     log(`Registration successful`);
   }
-
 
   static async addOwner(repo, owner, contractAddress, from, { log } = {}) {
     log = log || defaultLogger;
@@ -115,6 +118,22 @@ class Githereum {
     return headSha;
   }
 
+  async loadBlobStoreConfig() {
+    if (this.blobStorageConfig) { return; }
+
+
+    let contract = await this.contract();
+    let repo = await contract.repos(this.repoName);
+
+    if (!repo.registered) {
+      throw new Error(`${this.repoName} is not registered`);
+    }
+
+    this.blobStorageConfig = JSON.parse(repo.blobStoreMeta);
+
+    validateBlobStoreConfig(this.blobStorageConfig);
+  }
+
   async storeTree(treeId) {
     await this.writeToPackfile(treeId);
 
@@ -141,6 +160,8 @@ class Githereum {
   }
 
   async downloadAllPackfiles(sha) {
+    await this.loadBlobStoreConfig();
+
     let contract = await this.contract();
 
     while (sha && sha.length) {
@@ -173,8 +194,7 @@ class Githereum {
   }
 
   async writePushToBlockchain(commit, tag, packSha) {
-    let meta = JSON.stringify(blobStoreMeta(this.blobStorageConfig));
-    await (await this.contract()).push(this.repoName, tag, commit.oid, packSha, meta, {from: this.from});
+    await (await this.contract()).push(this.repoName, tag, commit.oid, packSha, {from: this.from});
   }
 
   async contract() {
@@ -278,6 +298,7 @@ class Githereum {
   }
 
   async writeToBlobStream(key, blob) {
+    await this.loadBlobStoreConfig();
     await writeToBlobStream(key, blob, this.blobStorageConfig);
   }
 

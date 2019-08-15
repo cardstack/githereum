@@ -43,20 +43,34 @@ and `<tag>` is the name of the tag to push to or clone from.
 Githereum
 
 Usage:
-  npx truffle exec cli.js <contract> register --from <address> <repo>
-  npx truffle exec cli.js <contract> push --from <address> <path> <repo:tag>
+  npx truffle exec cli.js <contract> register <repo> [<blob options>] [--from <address>]
+  npx truffle exec cli.js <contract> push <path> <repo:tag> [--from <address>]
   npx truffle exec cli.js <contract> clone <repo:tag> <path>
   npx truffle exec cli.js <contract> pull <repo:tag> <path>
   npx truffle exec cli.js <contract> head <repo:tag>
-  npx truffle exec cli.js <contract> add owner --from <address> <repo> <owner>
-  npx truffle exec cli.js <contract> remove owner --from <address> <repo> <owner>
-  npx truffle exec cli.js <contract> add writer --from <address> <repo> <writer>
-  npx truffle exec cli.js <contract> remove writer --from <address> <repo> <writer>
+  npx truffle exec cli.js <contract> add owner <repo> <owner> [--from <address>]
+  npx truffle exec cli.js <contract> remove owner <repo> <owner> [--from <address>]
+  npx truffle exec cli.js <contract> add writer <repo> <writer> [--from <address>]
+  npx truffle exec cli.js <contract> remove writer <repo> <writer> [--from <address>]
 
 Options:
   -f, --from <address>  Address of transaction sender
   -h, --help            Show this screen
   -v, --version         Show version
+
+Blob options when registering a repo:
+  This should be a json string containing a description of where the blobs for
+  this repo are stored. This is written publically to the blockchain so should
+  not contain secrets.
+
+  Default:
+    {"type":"tmpfile","path":"tmp/blobs"}
+
+  S3:
+    {"type":"s3","bucket":"my-s3-bucket"}
+
+    S3 credentials can be provided with environment variables AWS_ACCESS_KEY_ID
+    and AWS_SECRET_ACCESS KEY, or implicitly with security groups within AWS.
 ```
 
 ## Testing

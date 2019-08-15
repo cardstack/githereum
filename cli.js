@@ -4,23 +4,39 @@ const neodoc = require('neodoc');
 
 const help =
 
+// There is a helpful webapp to generate this spec:
+// https://felixschl.github.io/neodoc
 `Githereum
 
 Usage:
-  githereum <contract> register --from <address> <repo>
-  githereum <contract> push --from <address> <path> <repo:tag>
+  githereum <contract> register <repo> [<blob options>] [--from <address>]
+  githereum <contract> push <path> <repo:tag> [--from <address>]
   githereum <contract> clone <repo:tag> <path>
   githereum <contract> pull <repo:tag> <path>
   githereum <contract> head <repo:tag>
-  githereum <contract> add owner --from <address> <repo> <owner>
-  githereum <contract> remove owner --from <address> <repo> <owner>
-  githereum <contract> add writer --from <address> <repo> <writer>
-  githereum <contract> remove writer --from <address> <repo> <writer>
+  githereum <contract> add owner <repo> <owner> [--from <address>]
+  githereum <contract> remove owner <repo> <owner> [--from <address>]
+  githereum <contract> add writer <repo> <writer> [--from <address>]
+  githereum <contract> remove writer <repo> <writer> [--from <address>]
 
 Options:
   -f, --from <address>  Address of transaction sender
   -h, --help            Show this screen
   -v, --version         Show version
+
+Blob options when registering a repo:
+  This should be a json string containing a description of where the blobs for
+  this repo are stored. This is written publically to the blockchain so should
+  not contain secrets.
+
+  Default:
+    {"type":"tmpfile","path":"tmp/blobs"}
+
+  S3:
+    {"type":"s3","bucket":"my-s3-bucket"}
+
+    S3 credentials can be provided with environment variables AWS_ACCESS_KEY_ID
+    and AWS_SECRET_ACCESS KEY, or implicitly with security groups within AWS.
 `;
 
 let contractAddress, from, log;
@@ -81,13 +97,10 @@ module.exports = async function (done) {
   const { version }  = require('./package.json');
 
   try {
-    log(argv);
     const args = neodoc.run(help, { argv, version, smartOptions: true });
 
     contractAddress = args['<contract>'];
     from = args['--from'];
-
-    log(args);
 
     if (args.register) {
       await register(args['<repo>']);

@@ -11,6 +11,8 @@ contract Githereum {
 
     mapping(string => Push) pushes;
     mapping(string => Push) headShas;
+
+    string blobStoreMeta;
   }
 
   mapping(string => Repo) public repos;
@@ -19,7 +21,6 @@ contract Githereum {
     string tag;
     string headSha;
     string packSha;
-    string blobStoreMeta;
 
     string previousPushHeadSha;
   }
@@ -28,8 +29,7 @@ contract Githereum {
     string memory repoName,
     string memory tag,
     string memory headSha,
-    string memory packSha,
-    string memory blobStoreMeta) public {
+    string memory packSha) public {
 
     Repo storage repo = repos[repoName];
 
@@ -47,17 +47,18 @@ contract Githereum {
     p.tag = tag;
     p.headSha = headSha;
     p.packSha = packSha;
-    p.blobStoreMeta = blobStoreMeta;
     p.previousPushHeadSha = previousPushHeadSha;
 
     repo.headShas[headSha] = p;
   }
 
-  function register(string memory name) public {
+  function register(string memory name, string memory blobStoreMeta) public {
     Repo storage r = repos[name];
 
     require(!r.registered, "Repo already exists");
     r.registered = true;
+    r.blobStoreMeta = blobStoreMeta;
+
     _addOwner(r, msg.sender);
   }
 

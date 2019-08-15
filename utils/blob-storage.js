@@ -7,27 +7,25 @@ const s3blobs                                   = require('s3-blob-store');
 const tmp                                       = require('tmp');
 const promisepipe                               = require("promisepipe");
 
-
-function blobStoreMeta(config) {
-  let info = {};
-
-  if (config.type === 'tmpfile') {
-    info.path = config.path;
-  } else if (config.bucket) {
-    info.bucket = config.bucket;
+function validateBlobStoreConfig(config) {
+  if(!config.type) {
+    throw new Error("Blob storage config requires a key named 'type'");
   }
 
-  return {
-    type: config.type,
-    info
-  };
+  if (config.type === 'file' && !config.path) {
+    throw new Error("File blob storage requires a key named 'path'");
+  }
+
+  if (config.type === 's3' && !config.path) {
+    throw new Error("File blob storage requires a key named 'path'");
+  }
 }
 
 async function blobStore(config) {
-  if (config.type === 'tmpfile') {
+  if (config.type === 'file') {
     await shellCommand(`mkdir -p ${config.path}`);
     return fsBlobStore(`${config.path}`);
-  } else {
+  } else if (config.type === 's3') {
     let s3Client = new aws.S3({
       accessKeyId:      config.aws_access_key_id,
       secretAccessKey:  config.aws_secret_access_key
@@ -70,6 +68,6 @@ async function readFromBlobStream(key, config) {
 
 
 module.exports = {
-  writeToBlobStream, readFromBlobStream, blobStoreMeta
+  writeToBlobStream, readFromBlobStream, validateBlobStoreConfig
 };
 
