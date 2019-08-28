@@ -7,16 +7,13 @@ const { writeToBlobStream, readFromBlobStream, validateBlobStoreConfig }   = req
 const { writeFileSync, existsSync }        = require('fs');
 const { join }             = require('path');
 
-const GithereumContract = artifacts.require('Githereum');
-
-
 class Githereum {
-  constructor(repoPath, repoName, contractAddress, from, { log }={}) {
+  constructor(repoPath, repoName, contract, from, { log }={}) {
     if (!repoPath) {
       throw new Error("repoPath is a required argument");
     }
-    if (!contractAddress) {
-      throw new Error("contractAddress is a required argument");
+    if (!contract) {
+      throw new Error("contract is a required argument");
     }
 
     if (!repoName) {
@@ -31,13 +28,13 @@ class Githereum {
       this.gitDir = this.repoPath;
     }
 
-    this.contractAddress = contractAddress;
+    this.contract = contract;
     this.from = from;
 
     this.log        = log || defaultLogger;
   }
 
-  static async register(repo, contractAddress, from, { log, blobStorageConfig } = {}) {
+  static async register(repo, contract, from, { log, blobStorageConfig } = {}) {
 
 
     this.blobStorageConfig = blobStorageConfig || {
@@ -54,63 +51,57 @@ class Githereum {
     }
 
     log(`Registering repo ${repo}`);
-    let contract = await GithereumContract.at(contractAddress);
 
     await contract.register(repo, JSON.stringify(this.blobStorageConfig), { from });
 
     log(`Registration successful`);
   }
 
-  static async addOwner(repo, owner, contractAddress, from, { log } = {}) {
+  static async addOwner(repo, owner, contract, from, { log } = {}) {
     log = log || defaultLogger;
 
     log(`Adding owner ${owner} to repo ${repo}`);
-    let contract = await GithereumContract.at(contractAddress);
 
     await contract.addOwner(repo, owner, { from });
 
     log(`Adding owner successful`);
   }
 
-  static async removeOwner(repo, owner, contractAddress, from, { log } = {}) {
+  static async removeOwner(repo, owner, contract, from, { log } = {}) {
     log = log || defaultLogger;
 
     log(`Removing owner ${owner} from repo ${repo}`);
-    let contract = await GithereumContract.at(contractAddress);
 
     await contract.removeOwner(repo, owner, { from });
 
     log(`Removing owner successful`);
   }
 
-  static async addWriter(repo, writer, contractAddress, from, { log } = {}) {
+  static async addWriter(repo, writer, contract, from, { log } = {}) {
     log = log || defaultLogger;
 
     log(`Adding writer ${writer} to repo ${repo}`);
-    let contract = await GithereumContract.at(contractAddress);
 
     await contract.addWriter(repo, writer, { from });
 
     log(`Adding writer successful`);
   }
 
-  static async removeWriter(repo, writer, contractAddress, from, { log } = {}) {
+  static async removeWriter(repo, writer, contract, from, { log } = {}) {
     log = log || defaultLogger;
 
     log(`Removing writer ${writer} from repo ${repo}`);
-    let contract = await GithereumContract.at(contractAddress);
 
     await contract.removeWriter(repo, writer, { from });
 
     log(`Removing writer successful`);
   }
 
-  static async head(repoName, tag, contractAddress, { log } = {}) {
+  static async head(repoName, tag, contract, { log } = {}) {
     log = log || defaultLogger;
 
     log(`Checking status of tag ${tag}`);
 
-    let contract = await GithereumContract.at(contractAddress);
     let headSha = await contract.head(repoName, tag);
 
     log(`Sha of ${tag} is ${headSha}`);
@@ -122,8 +113,7 @@ class Githereum {
     if (this.blobStorageConfig) { return; }
 
 
-    let contract = await this.contract();
-    let repo = await contract.repos(this.repoName);
+    let repo = await this.contract.repos(this.repoName);
 
     if (!repo.registered) {
       throw new Error(`${this.repoName} is not registered`);
@@ -149,9 +139,7 @@ class Githereum {
   }
 
   async downloadPush(tag) {
-    let contract = await this.contract();
-
-    let headSha = await contract.head(this.repoName, tag);
+    let headSha = await this.contract.head(this.repoName, tag);
 
     await this.downloadAllPackfiles(headSha);
 
@@ -162,11 +150,9 @@ class Githereum {
   async downloadAllPackfiles(sha) {
     await this.loadBlobStoreConfig();
 
-    let contract = await this.contract();
-
     while (sha && sha.length) {
 
-      let packSha = await contract.pack(this.repoName, sha);
+      let packSha = await this.contract.pack(this.repoName, sha);
 
       let packFile = await readFromBlobStream(packSha, this.blobStorageConfig);
 
@@ -176,7 +162,7 @@ class Githereum {
 
       await this.gitCommand('indexPack', { filepath: join('.git/objects/pack', packSha) });
 
-      sha = await contract.previousPushHeadSha(this.repoName, sha);
+      sha = await this.contract.previousPushHeadSha(this.repoName, sha);
     }
 
   }
@@ -194,16 +180,7 @@ class Githereum {
   }
 
   async writePushToBlockchain(commit, tag, packSha) {
-    await (await this.contract()).push(this.repoName, tag, commit.oid, packSha, {from: this.from});
-  }
-
-  async contract() {
-    if (this.githereumContract) {
-      return this.githereumContract;
-    }
-
-    this.githereumContract = await GithereumContract.at(this.contractAddress);
-    return this.githereumContract;
+    await this.contract.push(this.repoName, tag, commit.oid, packSha, {from: this.from});
   }
 
   async push(tag) {
@@ -215,7 +192,7 @@ class Githereum {
     let head;
 
     try {
-      head = await Githereum.head(this.repoName, tag, this.contractAddress, { log: this.log });
+      head = await Githereum.head(this.repoName, tag, this.contract, { log: this.log });
     } catch(e) {
       // There is no head for this tag
     }
