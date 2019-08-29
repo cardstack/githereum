@@ -1,6 +1,8 @@
 const Githereum          = require('./githereum');
 
 const neodoc = require('neodoc');
+const TruffleContract = require("truffle-contract");
+const GithereumContract = require("./build/contracts/Githereum.json");
 
 const help =
 
@@ -9,22 +11,23 @@ const help =
 `Githereum
 
 Usage:
-  githereum <contract> register <repo> [<blob options>] [--from <address>]
-  githereum <contract> push <path> <repo:tag> [--from <address>]
-  githereum <contract> clone <repo:tag> <path>
-  githereum <contract> pull <repo:tag> <path>
-  githereum <contract> head <repo:tag>
-  githereum <contract> add owner <repo> <owner> [--from <address>]
-  githereum <contract> remove owner <repo> <owner> [--from <address>]
-  githereum <contract> add writer <repo> <writer> [--from <address>]
-  githereum <contract> remove writer <repo> <writer> [--from <address>]
+  githereum <contract> register <repo> [<blob storage>] [options]
+  githereum <contract> push <path> <repo:tag> [options]
+  githereum <contract> clone <repo:tag> <path> [options]
+  githereum <contract> pull <repo:tag> <path> [options]
+  githereum <contract> head <repo:tag> [options]
+  githereum <contract> add owner <repo> <owner> [options]
+  githereum <contract> remove owner <repo> <owner> [options]
+  githereum <contract> add writer <repo> <writer> [options]
+  githereum <contract> remove writer <repo> <writer> [options]
 
 Options:
-  -f, --from <address>  Address of transaction sender
-  -h, --help            Show this screen
-  -v, --version         Show version
+  -f, --from <address> Address of transaction sender
+  -h, --help           Show this screen
+  -v, --version        Show version
+  -p, --provider <url> Web3 Provider address, default http://localhost:9545
 
-Blob options when registering a repo:
+Blob storage when registering a repo:
   This should be a json string containing a description of where the blobs for
   this repo are stored. This is written publically to the blockchain so should
   not contain secrets.
@@ -39,47 +42,49 @@ Blob options when registering a repo:
     and AWS_SECRET_ACCESS KEY, or implicitly with security groups within AWS.
 `;
 
-let contractAddress, from, log;
+let contract, from, log;
 
 
 
-async function register(repo) {
-  await Githereum.register(repo, contractAddress, from, { log });
+async function register(repo, blobStorageJSON) {
+  let blobStorageConfig;
+  if (blobStorageJSON) { blobStorageConfig = JSON.parse(blobStorageJSON); }
+  await Githereum.register(repo, contract, from, { log, blobStorageConfig });
 }
 
 async function push(path, repoName, tag) {
-  let githereum = new Githereum(path, repoName, contractAddress, from, { log });
+  let githereum = new Githereum(path, repoName, contract, from, { log });
   await githereum.push(tag);
 }
 
 async function addOwner(repo, owner) {
-  await Githereum.addOwner(repo, owner, contractAddress, from, { log });
+  await Githereum.addOwner(repo, owner, contract, from, { log });
 }
 
 async function removeOwner(repo, owner) {
-  await Githereum.removeOwner(repo, owner, contractAddress, from, { log });
+  await Githereum.removeOwner(repo, owner, contract, from, { log });
 }
 
 async function addWriter(repo, writer) {
-  await Githereum.addWriter(repo, writer, contractAddress, from, { log });
+  await Githereum.addWriter(repo, writer, contract, from, { log });
 }
 
 async function removeWriter(repo, writer) {
-  await Githereum.removeWriter(repo, writer, contractAddress, from, { log });
+  await Githereum.removeWriter(repo, writer, contract, from, { log });
 }
 
 async function clone(repoName, tag, path) {
-  let githereum = new Githereum(path, repoName, contractAddress, from, { log });
+  let githereum = new Githereum(path, repoName, contract, from, { log });
   await githereum.clone(tag);
 }
 
 async function pull(repoName, tag, path) {
-  let githereum = new Githereum(path, repoName, contractAddress, from, { log });
+  let githereum = new Githereum(path, repoName, contract, from, { log });
   await githereum.pull(tag);
 }
 
 async function head(repoName, tag) {
-  await Githereum.head(repoName, tag, contractAddress, { log });
+  await Githereum.head(repoName, tag, contract, { log });
 }
 
 module.exports = async function (done) {
@@ -99,11 +104,18 @@ module.exports = async function (done) {
   try {
     const args = neodoc.run(help, { argv, version, smartOptions: true });
 
-    contractAddress = args['<contract>'];
+    let contractAddress = args['<contract>'];
+    let providerUrl = args['--provider'] || "http://localhost:9545";
+
     from = args['--from'];
 
+    let Githereum = TruffleContract(GithereumContract);
+    Githereum.setProvider(providerUrl);
+    contract = await Githereum.at(contractAddress);
+
+
     if (args.register) {
-      await register(args['<repo>']);
+      await register(args['<repo>'], args['<blob storage>']);
     }
 
     if (args.add && args.owner) {

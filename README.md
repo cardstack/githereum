@@ -43,22 +43,23 @@ and `<tag>` is the name of the tag to push to or clone from.
 Githereum
 
 Usage:
-  npx truffle exec cli.js <contract> register <repo> [<blob options>] [--from <address>]
-  npx truffle exec cli.js <contract> push <path> <repo:tag> [--from <address>]
-  npx truffle exec cli.js <contract> clone <repo:tag> <path>
-  npx truffle exec cli.js <contract> pull <repo:tag> <path>
-  npx truffle exec cli.js <contract> head <repo:tag>
-  npx truffle exec cli.js <contract> add owner <repo> <owner> [--from <address>]
-  npx truffle exec cli.js <contract> remove owner <repo> <owner> [--from <address>]
-  npx truffle exec cli.js <contract> add writer <repo> <writer> [--from <address>]
-  npx truffle exec cli.js <contract> remove writer <repo> <writer> [--from <address>]
+  npx truffle exec cli.js <contract> register <repo> [<blob storage>] [options]
+  npx truffle exec cli.js <contract> push <path> <repo:tag> [options]
+  npx truffle exec cli.js <contract> clone <repo:tag> <path> [options]
+  npx truffle exec cli.js <contract> pull <repo:tag> <path> [options]
+  npx truffle exec cli.js <contract> head <repo:tag> [options]
+  npx truffle exec cli.js <contract> add owner <repo> <owner> [options]
+  npx truffle exec cli.js <contract> remove owner <repo> <owner> [options]
+  npx truffle exec cli.js <contract> add writer <repo> <writer> [options]
+  npx truffle exec cli.js <contract> remove writer <repo> <writer> [options]
 
 Options:
-  -f, --from <address>  Address of transaction sender
-  -h, --help            Show this screen
-  -v, --version         Show version
+  -f, --from <address> Address of transaction sender
+  -h, --help           Show this screen
+  -v, --version        Show version
+  -p, --provider <url> Web3 Provider address, default http://localhost:9545
 
-Blob options when registering a repo:
+Blob storage when registering a repo:
   This should be a json string containing a description of where the blobs for
   this repo are stored. This is written publically to the blockchain so should
   not contain secrets.
@@ -72,6 +73,22 @@ Blob options when registering a repo:
     S3 credentials can be provided with environment variables AWS_ACCESS_KEY_ID
     and AWS_SECRET_ACCESS KEY, or implicitly with security groups within AWS.
 ```
+
+## Setup
+
+To setup and use locally against a test network:
+
+1. In a terminal window, run `npx truffle dev`
+2. In a new terminal, clone the repo and cd into the repo directory. Run `npm install`
+3. The truffle dev console will output a bunch of accounts and private keys. In
+  the second console, set from as a var, e.g. `FROM=0xc57a80df9fea122036981e144d3b504512e85cd9` (but use an account copied from the truffle console)
+4. `npm run build` - this builds the solidity contract
+5. `npx zos push --network development` - this deploys the compiled contract to the fake truffle network running in the other terminal
+5. `npx zos create Githereum --network development --no-interactive` - this will create an proxy instance of the contract that you can call functions on.
+   It outputs as the last line an address. Save this address in a variable, e.g. `CONTRACT_ADDRESS=0x41f9C54Ba41EB2f1f652fecE6053C4D25E4f33D6`
+6. Now you can run githereum commands, e.g. `npx truffle exec cli.js $CONTRACT_ADDRESS register  my-great-repo --from $FROM`
+
+Usage against a real network is similar, pass in the --provider option with a web3 provider url
 
 ## Testing
 1. From the command line execute: `npm run build`. This will clear the `build/` folder and re-generate the ZOS proxy contracts.
