@@ -92,7 +92,7 @@ Note that whenever you restart the truffle dev console, you will need to delete 
     - First, register a repository name. Run `npx truffle exec cli.js $CONTRACT_ADDRESS register some-name --from $FROM` where `some-name` is any name of your choice.
     - In another directory, create a new git repository `some-name` and add some commits to it. To write those commit SHAs on chain, run `npx truffle exec cli.js $CONTRACT_ADDRESS push /path/to/some-name some-name:my-tag-name --from $FROM`. Here, `my-tag-name` is any name of your choice, not a git tag.
     - Check that your push was successful with `npx truffle exec cli.js $CONTRACT_ADDRESS head some-name:my-tag-name --from $FROM`. The on-chain SHA shown should match the SHA of the last commit you made to your `some-name` repository.
-    - Try cloning the repo into a new directory, `npx truffle exec cli.js $CONTRACT_ADDRESS clone my-great-repo:one ../new-directory --from $FROM` and run `git status` to see the commits.
+    - Try cloning the repo into a new directory, `npx truffle exec cli.js $CONTRACT_ADDRESS ../clone my-great-repo:one ../new-directory --from $FROM`, `cd ../clone`, and run `git status` to see the commits.
 
 ## Remote setup
 
