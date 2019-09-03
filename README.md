@@ -74,21 +74,29 @@ Blob storage when registering a repo:
     and AWS_SECRET_ACCESS KEY, or implicitly with security groups within AWS.
 ```
 
-## Setup
+## Local Setup
 
-To setup and use locally against a test network:
+You can run and test githereum locally on your computer. Follow these steps to apply the contract to a local network, create a git repository with some commits, and write the commit SHAs to a local blockchain.
 
-1. In a terminal window, run `npx truffle dev`
-2. In a new terminal, clone the repo and cd into the repo directory. Run `npm install`
-3. The truffle dev console will output a bunch of accounts and private keys. In
-  the second console, set from as a var, e.g. `FROM=0xc57a80df9fea122036981e144d3b504512e85cd9` (but use an account copied from the truffle console)
+1. Clone this `githereum` repo, `cd` into the repo directory, and run `npm install`.
+2. Open a second terminal window. There, run `npx truffle dev`.
+The truffle dev console will output a bunch of accounts and private keys.
+Copy one of the accounts to your clipboard. Leave this process running.
+Note that whenever you restart the truffle dev console, you will need to delete the `zos.dev` file and go through all the commands below again.
+3. Go back to the first console and save the Account you copied as a variable, e.g. `FROM=0xc57a80df9fea122036981e144d3b504512e85cd9`.
 4. `npm run build` - this builds the solidity contract
 5. `npx zos push --network development` - this deploys the compiled contract to the fake truffle network running in the other terminal
 5. `npx zos create Githereum --network development --no-interactive` - this will create an proxy instance of the contract that you can call functions on.
    It outputs as the last line an address. Save this address in a variable, e.g. `CONTRACT_ADDRESS=0x41f9C54Ba41EB2f1f652fecE6053C4D25E4f33D6`
-6. Now you can run githereum commands, e.g. `npx truffle exec cli.js $CONTRACT_ADDRESS register  my-great-repo --from $FROM`
+6. Now you can run githereum commands! For example:
+    - First, register a repository name. Run `npx truffle exec cli.js $CONTRACT_ADDRESS register some-name --from $FROM` where `some-name` is any name of your choice.
+    - In another directory, create a new git repository `some-name` and add some commits to it. To write those commit SHAs on chain, run `npx truffle exec cli.js $CONTRACT_ADDRESS push /path/to/some-name some-name:my-tag-name --from $FROM`. Here, `my-tag-name` is any name of your choice, not a git tag.
+    - Check that your push was successful with `npx truffle exec cli.js $CONTRACT_ADDRESS head some-name:my-tag-name --from $FROM`. The on-chain SHA shown should match the SHA of the last commit you made to your `some-name` repository.
+    - Try cloning the repo into a new directory, `npx truffle exec cli.js $CONTRACT_ADDRESS ../clone my-great-repo:one ../new-directory --from $FROM`, `cd ../clone`, and run `git status` to see the commits.
 
-Usage against a real network is similar, pass in the --provider option with a web3 provider url
+## Remote setup
+
+Usage against a real network is similar to the local steps above. Pass in the `--provider` option with a web3 provider url.
 
 ## Testing
 1. From the command line execute: `npm run build`. This will clear the `build/` folder and re-generate the ZOS proxy contracts.
