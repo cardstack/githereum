@@ -4,6 +4,7 @@ const neodoc = require('neodoc');
 const TruffleContract = require("truffle-contract");
 const GithereumContract = require("./build/contracts/Githereum.json");
 
+
 const help =
 
 // There is a helpful webapp to generate this spec:
@@ -16,16 +17,18 @@ Usage:
   githereum <contract> clone <repo:tag> <path> [options]
   githereum <contract> pull <repo:tag> <path> [options]
   githereum <contract> head <repo:tag> [options]
-  githereum <contract> add owner <repo> <owner> [options]
-  githereum <contract> remove owner <repo> <owner> [options]
-  githereum <contract> add writer <repo> <writer> [options]
-  githereum <contract> remove writer <repo> <writer> [options]
+  githereum <contract> (add|remove) owner <repo> <owner> [options]
+  githereum <contract> (add|remove) writer <repo> <writer> [options]
+  githereum <contract> (add|remove) reader <repo> <reader> [options]
+  githereum keygen <keydir>
 
 Options:
-  -f, --from <address> Address of transaction sender
-  -h, --help           Show this screen
-  -v, --version        Show version
-  -p, --provider <url> Web3 Provider address, default http://localhost:9545
+  -f, --from <address>     Address of transaction sender
+  -h, --help               Show this screen
+  -v, --version            Show version
+  -p, --provider <url>     Web3 Provider address, default http://localhost:9545
+  --private <keydir>  Directory of private key to use for this operation
+  --public <keydir>   Directory of public key to use for this operation
 
 Blob storage when registering a repo:
   This should be a json string containing a description of where the blobs for
@@ -42,23 +45,23 @@ Blob storage when registering a repo:
     and AWS_SECRET_ACCESS KEY, or implicitly with security groups within AWS.
 `;
 
-let contract, from, log;
+let contract, from, log, privateKeyDir, publicKeyDir;
 
 
 
-async function register(repo, blobStorageJSON) {
+async function register(repo, blobStorageJSON, keyPath) {
   let blobStorageConfig;
   if (blobStorageJSON) { blobStorageConfig = JSON.parse(blobStorageJSON); }
-  await Githereum.register(repo, contract, from, { log, blobStorageConfig });
+  await Githereum.register(repo, contract, from, { keyPath, log, blobStorageConfig });
 }
 
 async function push(path, repoName, tag) {
-  let githereum = new Githereum(path, repoName, contract, from, { log });
+  let githereum = new Githereum(path, repoName, contract, from, { privateKeyDir, log });
   await githereum.push(tag);
 }
 
 async function addOwner(repo, owner) {
-  await Githereum.addOwner(repo, owner, contract, from, { log });
+  await Githereum.addOwner(repo, owner, contract, from, { log, privateKeyDir, publicKeyDir });
 }
 
 async function removeOwner(repo, owner) {
@@ -66,15 +69,23 @@ async function removeOwner(repo, owner) {
 }
 
 async function addWriter(repo, writer) {
-  await Githereum.addWriter(repo, writer, contract, from, { log });
+  await Githereum.addWriter(repo, writer, contract, from, { log, privateKeyDir, publicKeyDir });
 }
 
 async function removeWriter(repo, writer) {
   await Githereum.removeWriter(repo, writer, contract, from, { log });
 }
 
+async function addReader(repo, reader) {
+  await Githereum.addReader(repo, reader, privateKeyDir, publicKeyDir, contract, from, { log });
+}
+
+async function removeReader(repo, reader) {
+  await Githereum.removeReader(repo, reader, contract, from, { log });
+}
+
 async function clone(repoName, tag, path) {
-  let githereum = new Githereum(path, repoName, contract, from, { log });
+  let githereum = new Githereum(path, repoName, contract, from, { privateKeyDir, log });
   await githereum.clone(tag);
 }
 
@@ -85,6 +96,10 @@ async function pull(repoName, tag, path) {
 
 async function head(repoName, tag) {
   await Githereum.head(repoName, tag, contract, { log });
+}
+
+async function keygen(keydirPath) {
+  await Githereum.keygen(keydirPath);
 }
 
 module.exports = async function (done) {
@@ -109,13 +124,18 @@ module.exports = async function (done) {
 
     from = args['--from'];
 
-    let Githereum = TruffleContract(GithereumContract);
-    Githereum.setProvider(providerUrl);
-    contract = await Githereum.at(contractAddress);
+    privateKeyDir = args['--private'];
+    publicKeyDir = args['--public'];
+
+    if (contractAddress) {
+      let Githereum = TruffleContract(GithereumContract);
+      Githereum.setProvider(providerUrl);
+      contract = await Githereum.at(contractAddress);
+    }
 
 
     if (args.register) {
-      await register(args['<repo>'], args['<blob storage>']);
+      await register(args['<repo>'], args['<blob storage>'], privateKeyDir);
     }
 
     if (args.add && args.owner) {
@@ -132,6 +152,14 @@ module.exports = async function (done) {
 
     if (args.remove && args.writer) {
       await removeWriter(args['<repo>'], args['<writer>']);
+    }
+
+    if (args.add && args.reader) {
+      await addReader(args['<repo>'], args['<reader>']);
+    }
+
+    if (args.remove && args.reader) {
+      await removeReader(args['<repo>'], args['<reader>']);
     }
 
     if (args.push) {
@@ -152,6 +180,11 @@ module.exports = async function (done) {
     if (args.head) {
       let [repoName, tag] = args['<repo:tag>'].split(":");
       await head(repoName, tag);
+    }
+
+    if (args.keygen) {
+      let keydirPath = args['<keydir>'];
+      await keygen(keydirPath);
     }
   } catch(e) {
     done(e);

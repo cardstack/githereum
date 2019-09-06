@@ -4,10 +4,14 @@ pragma solidity 0.5.8;
 contract Githereum {
   struct Repo {
     bool registered;
+    bool isPublic;
     int ownerCount;
 
     mapping (address => bool) owners;
     mapping (address => bool) writers;
+    mapping (address => bool) readers;
+    mapping (address => string) keys;
+    mapping (address => string) publicKeys;
 
     mapping(string => Push) pushes;
     mapping(string => Push) headShas;
@@ -53,18 +57,47 @@ contract Githereum {
   }
 
   function register(string memory name, string memory blobStoreMeta) public {
-    Repo storage r = repos[name];
+    _registerRepo(name, blobStoreMeta);
 
-    require(!r.registered, "Repo already exists");
-    r.registered = true;
-    r.blobStoreMeta = blobStoreMeta;
+    Repo storage r = repos[name];
+    r.isPublic = true;
+    _addOwner(r, msg.sender);
+  }
+
+  function registerPrivate(
+    string memory name,
+    string memory blobStoreMeta,
+    string memory encryptedKey,
+    string memory publicKey) public {
+
+    _registerRepo(name, blobStoreMeta);
+
+    Repo storage r = repos[name];
+    r.isPublic = false;
 
     _addOwner(r, msg.sender);
+    r.keys[msg.sender] = encryptedKey;
+    r.publicKeys[msg.sender] = publicKey;
   }
 
   function addOwner(string memory repoName, address newOwner) public {
     require(isOwner(repoName, msg.sender), "Only repo owners can add new owners");
     _addOwner(repos[repoName], newOwner);
+  }
+
+  function addOwnerToPrivateRepo(
+    string memory repoName,
+    address newOwner,
+    string memory encryptedKey,
+    string memory publicKey
+  ) public {
+    require(isOwner(repoName, msg.sender), "Only repo owners can add new owners");
+
+    Repo storage r = repos[repoName];
+
+    _addOwner(r, newOwner);
+    r.keys[newOwner] = encryptedKey;
+    r.publicKeys[newOwner] = publicKey;
   }
 
   function removeOwner(string memory repoName, address ownerToRemove) public {
@@ -77,9 +110,38 @@ contract Githereum {
     _addWriter(repos[repoName], newWriter);
   }
 
+  function addWriterToPrivateRepo(
+    string memory repoName,
+    address newWriter,
+    string memory encryptedKey,
+    string memory publicKey
+  ) public {
+    require(isOwner(repoName, msg.sender), "Only repo owners can add new writers");
+    Repo storage r = repos[repoName];
+    _addWriter(r, newWriter);
+    r.keys[newWriter] = encryptedKey;
+    r.publicKeys[newWriter] = publicKey;
+  }
+
   function removeWriter(string memory repoName, address writerToRemove) public {
     require(isOwner(repoName, msg.sender), "Only repo owners can remove writers");
     _removeWriter(repos[repoName], writerToRemove);
+  }
+
+  function addReader(
+    string memory repoName,
+    address newReader,
+    string memory encryptedKey,
+    string memory publicKey
+  ) public {
+
+    require(isOwner(repoName, msg.sender), "Only repo owners can add new readers");
+    _addReader(repos[repoName], newReader, encryptedKey, publicKey);
+  }
+
+  function removeReader(string memory repoName, address readerToRemove) public {
+    require(isOwner(repoName, msg.sender), "Only repo owners can remove readers");
+    _removeReader(repos[repoName], readerToRemove);
   }
 
   function head(string memory repoName, string memory tag) public view returns (string memory) {
@@ -109,6 +171,46 @@ contract Githereum {
 
   function isWriter(string memory repoName, address account) public view returns (bool) {
     return hasWriter(repos[repoName], account);
+  }
+
+  function isReader(string memory repoName, address account) public view returns (bool) {
+    return hasReader(repos[repoName], account);
+  }
+
+  function isPublic(string memory repoName) public view returns (bool) {
+    return repos[repoName].isPublic;
+  }
+
+  function isPrivate(string memory repoName) public view returns (bool) {
+    return !repos[repoName].isPublic;
+  }
+
+  function publicKey(string memory repoName, address account) public view returns (string memory) {
+    Repo storage r = repos[repoName];
+    require(r.registered, "Repo is not registered");
+    require(!r.isPublic, "Repo is not a private repo");
+
+    require(account != address(0), "Null address checked");
+
+    return r.publicKeys[account];
+  }
+
+  function encryptedKey(string memory repoName, address account) public view returns (string memory) {
+    Repo storage r = repos[repoName];
+    require(r.registered, "Repo is not registered");
+    require(!r.isPublic, "Repo is not a private repo");
+
+    require(account != address(0), "Null address checked");
+
+    return r.keys[account];
+  }
+
+  function _registerRepo(string memory name, string memory blobStoreMeta) internal {
+    Repo storage r = repos[name];
+
+    require(!r.registered, "Repo already exists");
+    r.registered = true;
+    r.blobStoreMeta = blobStoreMeta;
   }
 
   function _addOwner(Repo storage repo, address account) internal {
@@ -152,4 +254,31 @@ contract Githereum {
     return repo.writers[account];
   }
 
+  function _addReader(
+    Repo storage repo,
+    address account,
+    string memory _encryptedKey,
+    string memory _publicKey
+  ) internal {
+
+    require(!repo.isPublic, "Readers cannot be added to public repos");
+    require(account != address(0), "Null address checked");
+    require(!hasReader(repo, account), "Address is already reader");
+
+    repo.readers[account] = true;
+    repo.keys[account] = _encryptedKey;
+    repo.publicKeys[account] = _publicKey;
+  }
+
+  function _removeReader(Repo storage repo, address account) internal {
+    require(account != address(0), "Null address checked");
+    require(hasReader(repo, account), "Address is not reader");
+
+    repo.readers[account] = false;
+  }
+
+  function hasReader(Repo storage repo, address account) internal view returns (bool) {
+    require(account != address(0), "Null address checked");
+    return repo.readers[account];
+  }
 }

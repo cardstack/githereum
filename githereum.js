@@ -2,13 +2,17 @@ const defaultLogger   = require('debug')('gitchain');
 const fs              = require('fs');
 const Git             = require('isomorphic-git');
 Git.plugins.set('fs', fs);
+const { resolve }                               = require('path');
+const { createKeyPair }                         = require('crypto2');
+const crypto2                                   = require('crypto2');
+const { writeFileSync, existsSync, mkdirSync }  = fs;
+const { join }                                  = require('path');
 
-const { writeToBlobStream, readFromBlobStream, validateBlobStoreConfig }   = require('./utils/blob-storage');
-const { writeFileSync, existsSync }        = require('fs');
-const { join }             = require('path');
+const { randomKey, encrypt, decrypt }                                     = require("./utils/crypto");
+const { writeToBlobStream, readFromBlobStream, validateBlobStoreConfig }  = require('./utils/blob-storage');
 
 class Githereum {
-  constructor(repoPath, repoName, contract, from, { log }={}) {
+  constructor(repoPath, repoName, contract, from, { log, privateKeyDir }={}) {
     if (!repoPath) {
       throw new Error("repoPath is a required argument");
     }
@@ -32,10 +36,11 @@ class Githereum {
     this.from = from;
 
     this.log        = log || defaultLogger;
+
+    this.privateKeyDir = privateKeyDir;
   }
 
-  static async register(repo, contract, from, { log, blobStorageConfig } = {}) {
-
+  static async register(repo, contract, from, { log, blobStorageConfig, keyPath } = {}) {
 
     this.blobStorageConfig = blobStorageConfig || {
       type: 'file',
@@ -52,17 +57,50 @@ class Githereum {
 
     log(`Registering repo ${repo}`);
 
-    await contract.register(repo, JSON.stringify(this.blobStorageConfig), { from });
+    let jsonStorage = JSON.stringify(this.blobStorageConfig);
+
+    if (keyPath) {
+      let { publicKeyPath } = Githereum.keyPaths(keyPath);
+      let publicKey = await crypto2.readPublicKey(publicKeyPath);
+
+      let symmetricKey = randomKey();
+
+
+      let encryptedKey = await crypto2.encrypt.rsa(symmetricKey, publicKey);
+
+
+      await contract.registerPrivate(repo, jsonStorage, encryptedKey, publicKey, { from });
+    } else {
+      await contract.register(repo, jsonStorage, { from });
+    }
+
 
     log(`Registration successful`);
   }
 
-  static async addOwner(repo, owner, contract, from, { log } = {}) {
+  static async addOwner(repo, owner, contract, from, { privateKeyDir, publicKeyDir, log } = {}) {
     log = log || defaultLogger;
 
     log(`Adding owner ${owner} to repo ${repo}`);
 
-    await contract.addOwner(repo, owner, { from });
+    if (await contract.isPrivate(repo)) {
+      if(!privateKeyDir || !publicKeyDir) {
+        throw new Error("Public and private key is required to add owner to private repo");
+      }
+
+      let { encryptedKey, publicKey } = await Githereum.reencryptedSymmetricKey(
+        privateKeyDir,
+        publicKeyDir,
+        repo,
+        from,
+        contract
+      );
+
+      await contract.addOwnerToPrivateRepo(repo, owner, encryptedKey, publicKey, { from });
+    } else {
+      await contract.addOwner(repo, owner, { from });
+    }
+
 
     log(`Adding owner successful`);
   }
@@ -77,12 +115,29 @@ class Githereum {
     log(`Removing owner successful`);
   }
 
-  static async addWriter(repo, writer, contract, from, { log } = {}) {
+  static async addWriter(repo, writer, contract, from, { privateKeyDir, publicKeyDir, log } = {}) {
     log = log || defaultLogger;
 
     log(`Adding writer ${writer} to repo ${repo}`);
 
-    await contract.addWriter(repo, writer, { from });
+
+    if (await contract.isPrivate(repo)) {
+      if(!privateKeyDir || !publicKeyDir) {
+        throw new Error("Public and private key is required to add writer to private repo");
+      }
+
+      let { encryptedKey, publicKey } = await Githereum.reencryptedSymmetricKey(
+        privateKeyDir,
+        publicKeyDir,
+        repo,
+        from,
+        contract
+      );
+
+      await contract.addWriterToPrivateRepo(repo, writer, encryptedKey, publicKey, { from });
+    } else {
+      await contract.addWriter(repo, writer, { from });
+    }
 
     log(`Adding writer successful`);
   }
@@ -97,6 +152,61 @@ class Githereum {
     log(`Removing writer successful`);
   }
 
+  static async addReader(repo, reader, ownerKeyDir, readerKeyDir, contract, from, { log } = {}) {
+    log = log || defaultLogger;
+
+    log(`Adding reader ${reader} to repo ${repo}`);
+
+    if(!ownerKeyDir || !readerKeyDir) {
+      throw new Error("Public and private key is required to add reader to private repo");
+    }
+
+    let { encryptedKey, publicKey } = await Githereum.reencryptedSymmetricKey(
+      ownerKeyDir,
+      readerKeyDir,
+      repo,
+      from,
+      contract
+    );
+
+    await contract.addReader(repo, reader, encryptedKey, publicKey, { from });
+
+    log(`Adding reader successful`);
+  }
+
+  static async getDecryptedKey(keyPath, repo, from, contract) {
+    let { privateKeyPath } = Githereum.keyPaths(keyPath);
+
+    let previouslyEncryptedSymmetricKey = await contract.encryptedKey(repo, from);
+    let privateKey = await crypto2.readPrivateKey(privateKeyPath);
+    return await crypto2.decrypt.rsa(previouslyEncryptedSymmetricKey, privateKey);
+  }
+
+  static async reencryptedSymmetricKey(ownerKeyDir, newKeyDir, repo, from, contract) {
+    let { publicKeyPath } = Githereum.keyPaths(newKeyDir);
+    let publicKey = await crypto2.readPublicKey(publicKeyPath);
+
+    let decryptedSymmetricKey = await Githereum.getDecryptedKey(ownerKeyDir, repo, from, contract);
+
+    let encryptedKey = await crypto2.encrypt.rsa(decryptedSymmetricKey, publicKey);
+
+    return {
+      encryptedKey,
+      publicKey
+    };
+
+  }
+
+  static async removeReader(repo, reader, contract, from, { log } = {}) {
+    log = log || defaultLogger;
+
+    log(`Removing reader ${reader} from repo ${repo}`);
+
+    await contract.removeReader(repo, reader, { from });
+
+    log(`Removing reader successful`);
+  }
+
   static async head(repoName, tag, contract, { log } = {}) {
     log = log || defaultLogger;
 
@@ -109,15 +219,38 @@ class Githereum {
     return headSha;
   }
 
-  async loadBlobStoreConfig() {
-    if (this.blobStorageConfig) { return; }
+  static async keygen(keyDir) {
 
+    mkdirSync(keyDir, { recursive: true });
 
+    let { publicKey, privateKey } = await createKeyPair();
+
+    let { publicKeyPath, privateKeyPath } = Githereum.keyPaths(keyDir);
+
+    writeFileSync(publicKeyPath, publicKey);
+    writeFileSync(privateKeyPath, privateKey);
+  }
+
+  static keyPaths(keyDir) {
+    let publicKeyPath = resolve(keyDir, 'rsa.pub');
+    let privateKeyPath = resolve(keyDir, 'rsa.pem');
+    return { publicKeyPath, privateKeyPath };
+  }
+
+  async ensureRegistered()  {
     let repo = await this.contract.repos(this.repoName);
 
     if (!repo.registered) {
       throw new Error(`${this.repoName} is not registered`);
     }
+    return repo;
+  }
+
+  async loadBlobStoreConfig() {
+    if (this.blobStorageConfig) { return; }
+
+
+    let repo = await this.ensureRegistered();
 
     this.blobStorageConfig = JSON.parse(repo.blobStoreMeta);
 
@@ -156,6 +289,10 @@ class Githereum {
 
       let packFile = await readFromBlobStream(packSha, this.blobStorageConfig);
 
+      if (this.encryptionKey) {
+        packFile = Buffer.from(JSON.parse(decrypt(packFile.toString(), this.encryptionKey)));
+      }
+
       let path = join(this.gitDir, "objects/pack", packSha);
 
       writeFileSync(path, packFile);
@@ -183,11 +320,27 @@ class Githereum {
     await this.contract.push(this.repoName, tag, commit.oid, packSha, {from: this.from});
   }
 
+  async handlePrivate() {
+    this.isPrivate = await this.contract.isPrivate(this.repoName);
+
+    if(this.isPrivate) {
+      if (!this.privateKeyDir) {
+        throw new Error("Private key is required for this repo operation");
+      }
+      if(!this.from) {
+        throw new Error("From argument is required for this repo operation");
+      }
+      this.encryptionKey = await Githereum.getDecryptedKey(this.privateKeyDir, this.repoName, this.from, this.contract);
+    }
+  }
+
   async push(tag) {
 
     if(!tag || !tag.length) {
       throw new Error("Tag must be provided to push to");
     }
+    await this.ensureRegistered();
+    await this.handlePrivate();
 
     let head;
 
@@ -220,16 +373,18 @@ class Githereum {
   }
 
   async clone(tag) {
+
     if(!tag || !tag.length) {
       throw new Error("Tag must be provided to clone from");
     }
+    await this.ensureRegistered();
+    await this.handlePrivate();
 
     if (existsSync(this.repoPath)) {
       throw new Error(`Path ${this.repoPath} already exists!`);
     }
 
     this.repo = await this.gitCommand('init');
-
 
     await this.downloadPush(tag);
   }
@@ -238,6 +393,8 @@ class Githereum {
     if(!tag || !tag.length) {
       throw new Error("Tag must be provided to pull from");
     }
+    await this.ensureRegistered();
+    await this.handlePrivate();
 
     if (!existsSync(this.repoPath)) {
       throw new Error(`Path ${this.repoPath} doesn't exist!`);
@@ -276,9 +433,13 @@ class Githereum {
 
   async writeToBlobStream(key, blob) {
     await this.loadBlobStoreConfig();
+
+    if (this.encryptionKey) {
+      blob = encrypt(JSON.stringify(blob), this.encryptionKey);
+    }
+
     await writeToBlobStream(key, blob, this.blobStorageConfig);
   }
-
 
   async readObject(sha) {
     let { object } = await this.gitCommand('readObject', { oid: sha, format: 'content'});

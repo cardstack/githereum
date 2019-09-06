@@ -3,6 +3,9 @@ const { shellCommand }            = require("../utils/async");
 const fs                          = require('fs');
 const glob                        = require('fast-glob');
 const Git                         = require('isomorphic-git');
+const { resolve }                 = require('path');
+const crypto2                     = require('crypto2');
+
 
 const { cli, setupFixtureRepo, setupBareFixtureRepo }   = require('./helper');
 
@@ -17,7 +20,7 @@ const GithereumContract = Contracts.getFromLocal('Githereum');
 
 
 contract("Githereum", (addresses) => {
-  const [ owner, repoOwner, someRandomAddress, otherOwner, ownerOfOtherRepo, writer, otherWriter ] = addresses;
+  const [ owner, repoOwner, someRandomAddress, otherOwner, ownerOfOtherRepo, writer, otherWriter, reader, otherReader ] = addresses;
 
   let githereumContract;
 
@@ -57,6 +60,8 @@ contract("Githereum", (addresses) => {
       expect(await githereumContract.methods.isOwner("my-great-repo", repoOwner).call()).to.be.ok;
       expect(await githereumContract.methods.isOwner("my-great-repo", owner).call()).to.not.be.ok;
       expect(await githereumContract.methods.isOwner("my-great-repo", someRandomAddress).call()).to.not.be.ok;
+      expect(await githereumContract.methods.isPublic("my-great-repo").call()).to.be.ok;
+      expect(await githereumContract.methods.isPrivate("my-great-repo").call()).to.not.be.ok;
       expect(await ownerCount('my-great-repo')).to.equal(1);
     });
 
@@ -240,10 +245,10 @@ contract("Githereum", (addresses) => {
       await expect(attemptedHead).to.be.rejectedWith(/Repo is not registered/);
 
       let attemptedClone = runCli(`clone some-repo:master tmp/repo`);
-      await expect(attemptedClone).to.be.rejectedWith(/Repo is not registered/);
+      await expect(attemptedClone).to.be.rejectedWith(/some-repo is not registered/);
 
       let attemptedPull = runCli(`pull some-repo:master tmp/repo`);
-      await expect(attemptedPull).to.be.rejectedWith(/Repo is not registered/);
+      await expect(attemptedPull).to.be.rejectedWith(/some-repo is not registered/);
     });
 
     it("Cannot register a repo with : in the name", async function() {
@@ -258,6 +263,295 @@ contract("Githereum", (addresses) => {
       await runCli(`head my-repo:my-tag`);
       await runCli(`clone my-repo:my-tag tmp/cloned`);
       await runCli(`pull my-repo:my-tag tmp/cloned`);
+    });
+
+  });
+
+  describe("Private Repos", async function() {
+    before(async function() {
+      await shellCommand("rm -rf testkeys");
+      await cli(`keygen testkeys/owner`);
+      await cli(`keygen testkeys/otherowner`);
+      await cli(`keygen testkeys/writer`);
+      await cli(`keygen testkeys/reader`);
+    });
+
+    after(async function() {
+      await shellCommand("rm -rf testkeys");
+    });
+
+    this.slow(4000);
+    it("Generates an rsa keypair", async function() {
+      await cli(`keygen tmp/mykeypair`);
+      expect(fs.readFileSync(resolve('tmp', 'mykeypair', 'rsa.pub'), 'utf8')).to.match(/BEGIN PUBLIC KEY/);
+      expect(fs.readFileSync(resolve('tmp', 'mykeypair', 'rsa.pem'), 'utf8')).to.match(/BEGIN RSA PRIVATE KEY/);
+    });
+
+
+    it("Registers a private repo", async function() {
+      await runCli(`register my-great-repo --private testkeys/owner --from ${repoOwner}`);
+
+      expect(await githereumContract.methods.isOwner("my-great-repo", repoOwner).call()).to.be.ok;
+      expect(await githereumContract.methods.isOwner("my-great-repo", owner).call()).to.not.be.ok;
+      expect(await githereumContract.methods.isOwner("my-great-repo", someRandomAddress).call()).to.not.be.ok;
+      expect(await githereumContract.methods.isPrivate("my-great-repo").call()).to.be.ok;
+      expect(await githereumContract.methods.isPublic("my-great-repo").call()).to.not.be.ok;
+
+
+      let publicKey = fs.readFileSync('testkeys/owner/rsa.pub', 'utf8');
+      expect(await githereumContract.methods.publicKey("my-great-repo", repoOwner).call()).to.equal(publicKey);
+
+      expect(await ownerCount('my-great-repo')).to.equal(1);
+    });
+
+
+    it("Repo owners can add new repo owners to a private repo", async function() {
+      await runCli(`register my-great-repo --private testkeys/owner --from ${repoOwner}`);
+
+      let key = await githereumContract.methods.encryptedKey("my-great-repo", repoOwner).call();
+
+      expect(await githereumContract.methods.isOwner("my-great-repo", otherOwner).call()).to.not.be.ok;
+
+      expect(await githereumContract.methods.encryptedKey("my-great-repo", repoOwner).call()).to.equal(key);
+
+      await runCli(`add owner my-great-repo ${otherOwner} --private testkeys/owner --public testkeys/otherowner --from ${repoOwner}`);
+
+      expect(await githereumContract.methods.encryptedKey("my-great-repo", repoOwner).call()).to.equal(key);
+
+      expect(await githereumContract.methods.isOwner("my-great-repo", repoOwner).call()).to.be.ok;
+      expect(await githereumContract.methods.isOwner("my-great-repo", otherOwner).call()).to.be.ok;
+      expect(await ownerCount('my-great-repo')).to.equal(2);
+
+      // Can decrypt symmetric key
+
+      let newOwnerPrivateKey = await crypto2.readPrivateKey('testkeys/otherowner/rsa.pem');
+      let ownerPrivateKey = await crypto2.readPrivateKey('testkeys/owner/rsa.pem');
+
+
+      let ownerEncryptedKey = await githereumContract.methods.encryptedKey("my-great-repo", repoOwner).call();
+      let newOwnerEncryptedKey = await githereumContract.methods.encryptedKey("my-great-repo", otherOwner).call();
+
+
+      let newOwnerDecryptedKey = await crypto2.decrypt.rsa(newOwnerEncryptedKey, newOwnerPrivateKey);
+
+      let ownerDecryptedKey = await crypto2.decrypt.rsa(ownerEncryptedKey, ownerPrivateKey);
+
+      expect(ownerDecryptedKey).to.equal(newOwnerDecryptedKey, "The symmetric keys should be the same after decrypting with the associated private key");
+    });
+
+    it("Requires key to add owner", async function() {
+      await runCli(`register my-great-repo --private testkeys/owner --from ${repoOwner}`);
+
+      expect(await githereumContract.methods.isOwner("my-great-repo", otherOwner).call()).to.not.be.ok;
+
+      let attemptedAdd =  runCli(`add owner my-great-repo ${otherOwner} --from ${repoOwner}`);
+
+      await expect(attemptedAdd).to.be.rejectedWith(/Public and private key is required to add owner to private repo/);
+    });
+
+    it("Repo owners can add writers to a private repo", async function() {
+      await runCli(`register my-great-repo --private testkeys/owner --from ${repoOwner}`);
+
+      expect(await githereumContract.methods.isWriter("my-great-repo", writer).call()).to.not.ok;
+
+      await runCli(`add writer my-great-repo ${writer} --private testkeys/owner --public testkeys/writer --from ${repoOwner}`);
+
+      expect(await githereumContract.methods.isWriter("my-great-repo", writer).call()).to.be.ok;
+
+
+      // Can decrypt symmetric key
+
+      let writerPrivateKey = await crypto2.readPrivateKey('testkeys/writer/rsa.pem');
+      let ownerPrivateKey = await crypto2.readPrivateKey('testkeys/owner/rsa.pem');
+
+      let ownerEncryptedKey = await githereumContract.methods.encryptedKey("my-great-repo", repoOwner).call();
+      let writerEncryptedKey = await githereumContract.methods.encryptedKey("my-great-repo", writer).call();
+
+
+      let writerDecryptedKey = await crypto2.decrypt.rsa(writerEncryptedKey, writerPrivateKey);
+
+      let ownerDecryptedKey = await crypto2.decrypt.rsa(ownerEncryptedKey, ownerPrivateKey);
+
+      expect(ownerDecryptedKey).to.equal(writerDecryptedKey, "The symmetric keys should be the same after decrypting with the associated private key");
+    });
+
+
+    it("Requires key to add writer", async function() {
+      await cli(`keygen tmp/mykeypair`);
+
+      await runCli(`register my-great-repo --private tmp/mykeypair --from ${repoOwner}`);
+
+      expect(await githereumContract.methods.isWriter("my-great-repo", writer).call()).to.not.ok;
+
+      let attemptedAdd = runCli(`add writer my-great-repo ${writer} --from ${repoOwner}`);
+
+      await expect(attemptedAdd).to.be.rejectedWith(/Public and private key is required to add writer to private repo/);
+    });
+
+
+    describe("Reader admin", async function() {
+
+      it("Cannot add readers to a public repo", async function() {
+        await runCli(`register my-great-repo --from ${repoOwner}`);
+
+        expect(await githereumContract.methods.isReader("my-great-repo", reader).call()).to.not.ok;
+
+        let attemptedAdd = runCli(`add reader my-great-repo ${reader} --private testkeys/owner --public testkeys/reader --from ${repoOwner}`);
+
+        await expect(attemptedAdd).to.be.rejectedWith(/Repo is not a private repo/);
+
+        expect(await githereumContract.methods.isReader("my-great-repo", reader).call()).to.not.ok;
+      });
+
+      it("Repo owners can add readers to a repo", async function() {
+        await runCli(`register my-great-repo --private testkeys/owner --from ${repoOwner}`);
+
+        expect(await githereumContract.methods.isPrivate("my-great-repo").call()).to.be.ok;
+
+        expect(await githereumContract.methods.isReader("my-great-repo", reader).call()).to.not.ok;
+
+        await runCli(`add reader my-great-repo ${reader} --private testkeys/owner --public testkeys/reader --from ${repoOwner}`);
+
+        expect(await githereumContract.methods.isReader("my-great-repo", reader).call()).to.be.ok;
+
+        // Can decrypt symmetric key
+
+        let readerPublicKey = fs.readFileSync('testkeys/reader/rsa.pub', 'utf8');
+
+        expect(await githereumContract.methods.publicKey("my-great-repo", reader).call()).to.equal(readerPublicKey);
+
+        let readerPrivateKey = await crypto2.readPrivateKey('testkeys/reader/rsa.pem');
+        let ownerPrivateKey = await crypto2.readPrivateKey('testkeys/owner/rsa.pem');
+
+
+        let ownerEncryptedKey = await githereumContract.methods.encryptedKey("my-great-repo", repoOwner).call();
+        let readerEncryptedKey = await githereumContract.methods.encryptedKey("my-great-repo", reader).call();
+
+
+        let readerDecryptedKey = await crypto2.decrypt.rsa(readerEncryptedKey, readerPrivateKey);
+
+        let ownerDecryptedKey = await crypto2.decrypt.rsa(ownerEncryptedKey, ownerPrivateKey);
+
+        expect(ownerDecryptedKey).to.equal(readerDecryptedKey, "The symmetric keys should be the same after decrypting with the associated private key");
+      });
+
+
+      it("Requires key to add reader", async function() {
+        await runCli(`register my-great-repo --private testkeys/owner --from ${repoOwner}`);
+
+        expect(await githereumContract.methods.isReader("my-great-repo", reader).call()).to.not.be.ok;
+
+        let attemptedAdd = runCli(`add reader my-great-repo ${reader} --from ${repoOwner}`);
+        await expect(attemptedAdd).to.be.rejectedWith(/Public and private key is required to add reader to private repo/);
+
+        expect(await githereumContract.methods.isReader("my-great-repo", reader).call()).to.not.be.ok;
+      });
+
+      it("Repo owners cannot add readers to a repo they do not own", async function() {
+       await runCli(`register my-great-repo --private testkeys/owner --from ${repoOwner}`);
+       await runCli(`register other-repo --private testkeys/owner --from ${otherOwner}`);
+
+       expect(await githereumContract.methods.isReader("my-great-repo", writer).call()).to.not.ok;
+
+       let attemptedAdd = runCli(`add reader my-great-repo ${reader} --private testkeys/owner --public testkeys/reader --from ${otherOwner}`);
+       await expect(attemptedAdd).to.be.rejectedWith(/Only repo owners can add new readers/);
+
+       expect(await githereumContract.methods.isReader("my-great-repo", writer).call()).to.not.ok;
+      });
+
+      it("Readers cannot add repo owners to a repo", async function() {
+        await runCli(`register my-great-repo --private testkeys/owner --from ${repoOwner}`);
+
+        await runCli(`add reader my-great-repo ${reader} --private testkeys/owner --public testkeys/reader --from ${repoOwner}`);
+
+        let attemptedAdd = runCli(`add owner my-great-repo ${someRandomAddress}  --private testkeys/reader --public testkeys/otherowner --from ${reader}`);
+        await expect(attemptedAdd).to.be.rejectedWith(/Only repo owners can add new owners/);
+      });
+
+      it("Readers cannot add writers to a repo", async function() {
+        await runCli(`register my-great-repo --private testkeys/owner --from ${repoOwner}`);
+
+        await runCli(`add reader my-great-repo ${reader} --private testkeys/owner --public testkeys/reader --from ${repoOwner}`);
+
+        let attemptedAdd = runCli(`add writer my-great-repo ${someRandomAddress}  --private testkeys/reader --public testkeys/reader --from ${reader}`);
+        await expect(attemptedAdd).to.be.rejectedWith(/Only repo owners can add new writers/);
+      });
+
+      it("Readers cannot add readers to a repo", async function() {
+        await runCli(`register my-great-repo --private testkeys/owner --from ${repoOwner}`);
+        await runCli(`add reader my-great-repo ${reader} --private testkeys/owner --public testkeys/reader --from ${repoOwner}`);
+        let attemptedAdd = runCli(`add reader my-great-repo ${someRandomAddress} --private testkeys/reader --public testkeys/reader --from ${reader}`);
+        await expect(attemptedAdd).to.be.rejectedWith(/Only repo owners can add new readers/);
+      });
+
+      it("Readers cannot remove repo owners from a repo", async function() {
+        await runCli(`register my-great-repo --private testkeys/owner --from ${repoOwner}`);
+        await runCli(`add reader my-great-repo ${reader} --private testkeys/owner --public testkeys/reader --from ${repoOwner}`);
+
+        let attemptedRemove = runCli(`remove owner my-great-repo ${repoOwner} --from ${reader}`);
+        await expect(attemptedRemove).to.be.rejectedWith(/Only repo owners can remove owners/);
+      });
+
+      it("Readers cannot remove writers from a repo", async function() {
+        await runCli(`register my-great-repo --private testkeys/owner --from ${repoOwner}`);
+        await runCli(`add writer my-great-repo ${writer} --private testkeys/owner --public testkeys/writer --from ${repoOwner}`);
+        await runCli(`add reader my-great-repo ${reader} --private testkeys/owner --public testkeys/reader --from ${repoOwner}`);
+
+        let attemptedRemove = runCli(`remove writer my-great-repo ${writer}  --private testkeys/owner --public testkeys/reader --from ${reader}`);
+        await expect(attemptedRemove).to.be.rejectedWith(/Only repo owners can remove writers/);
+      });
+
+      it("Readers cannot remove readers from a repo", async function() {
+        await runCli(`register my-great-repo --private testkeys/owner --from ${repoOwner}`);
+        await runCli(`add reader my-great-repo ${reader} --private testkeys/owner --public testkeys/reader --from ${repoOwner}`);
+        await runCli(`add reader my-great-repo ${otherReader} --private testkeys/owner --public testkeys/reader --from ${repoOwner}`);
+
+        let attemptedRemove = runCli(`remove reader my-great-repo ${otherReader} --from ${reader}`);
+        await expect(attemptedRemove).to.be.rejectedWith(/Only repo owners can remove reader/);
+      });
+
+      it("Writers cannot add readers to a repo", async function() {
+        await runCli(`register my-great-repo --private testkeys/owner --from ${repoOwner}`);
+        await runCli(`add writer my-great-repo ${writer} --private testkeys/owner --public testkeys/writer --from ${repoOwner}`);
+
+        let attemptedAdd = runCli(`add reader my-great-repo ${someRandomAddress} --private testkeys/writer --public testkeys/reader --from ${writer}`);
+        await expect(attemptedAdd).to.be.rejectedWith(/Only repo owners can add new readers/);
+      });
+
+      it("Writers cannot remove readers from a repo", async function() {
+        await runCli(`register my-great-repo --private testkeys/owner --from ${repoOwner}`);
+        await runCli(`add writer my-great-repo ${writer} --private testkeys/owner --public testkeys/writer --from ${repoOwner}`);
+        await runCli(`add reader my-great-repo ${reader} --private testkeys/owner --public testkeys/reader --from ${repoOwner}`);
+
+        let attemptedRemove = runCli(`remove reader my-great-repo ${reader} --private testkeys/writer --public testkeys/reader --from ${writer}`);
+        await expect(attemptedRemove).to.be.rejectedWith(/Only repo owners can remove readers/);
+      });
+
+
+    });
+
+    it("pushes a simple repo to the blockchain and restores it again using a private repo", async() => {
+      await setupFixtureRepo('dummygit');
+      await runCli(`register my-repo --private testkeys/owner --from ${repoOwner}`);
+
+      await runCli(`push tmp/dummygit my-repo:my-tag --private testkeys/owner --from ${repoOwner}`);
+
+      // the objects should be stored in the object store
+      let blobs = await glob('tmp/blobs/*');
+      expect(blobs.length).to.equal(1);
+
+      await runCli(`clone my-repo:my-tag tmp/cloned --private testkeys/owner --from ${repoOwner}`);
+
+      let fullRef = await Git.resolveRef({ dir: 'tmp/cloned', ref: 'master' });
+      expect(fullRef).to.equal('a47c8dc067a1648896f7de6759d25411f8f665a0');
+
+      let commits = await Git.log({ dir: 'tmp/cloned' });
+
+      expect(commits.length).to.equal(4);
+
+      expect(commits.map(c => c.oid)).to.deep.equal(["a47c8dc067a1648896f7de6759d25411f8f665a0", "247e877ae8a62139e3561fd95ac3cfa48cbfab97", "23e65d5097a41c4f6f9b2937f807c78296ea3298", "b5d928ed34f07b13cb2c664903b771b12ad2ca29"]);
+
+      expect(fs.readFileSync('tmp/cloned/README', 'utf8')).to.equal("Hello World\n");
     });
   });
 

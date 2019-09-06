@@ -26,6 +26,7 @@
     "aws-sdk": "^2.500.0",
     "chai": "^4.2.0",
     "chai-as-promised": "^7.1.1",
+    "crypto2": "^2.0.0",
     "fast-glob": "^3.0.4",
     "fs-blob-store": "^5.2.1",
     "ganache-cli": "^6.5.0",

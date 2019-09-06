@@ -48,16 +48,18 @@ Usage:
   npx truffle exec cli.js <contract> clone <repo:tag> <path> [options]
   npx truffle exec cli.js <contract> pull <repo:tag> <path> [options]
   npx truffle exec cli.js <contract> head <repo:tag> [options]
-  npx truffle exec cli.js <contract> add owner <repo> <owner> [options]
-  npx truffle exec cli.js <contract> remove owner <repo> <owner> [options]
-  npx truffle exec cli.js <contract> add writer <repo> <writer> [options]
-  npx truffle exec cli.js <contract> remove writer <repo> <writer> [options]
+  npx truffle exec cli.js <contract> (add|remove) owner <repo> <owner> [options]
+  npx truffle exec cli.js <contract> (add|remove) writer <repo> <writer> [options]
+  npx truffle exec cli.js <contract> (add|remove) reader <repo> <reader> [options]
+  npx truffle exec cli.js keygen <keydir>
 
 Options:
-  -f, --from <address> Address of transaction sender
-  -h, --help           Show this screen
-  -v, --version        Show version
-  -p, --provider <url> Web3 Provider address, default http://localhost:9545
+  -f, --from <address>     Address of transaction sender
+  -h, --help               Show this screen
+  -v, --version            Show version
+  -p, --provider <url>     Web3 Provider address, default http://localhost:9545
+  --private <keydir>  Directory of private key to use for this operation
+  --public <keydir>   Directory of public key to use for this operation
 
 Blob storage when registering a repo:
   This should be a json string containing a description of where the blobs for
