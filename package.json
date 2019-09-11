@@ -10,7 +10,8 @@
     "lint": "npm run lint:mocha && npm run lint:sol && npm run lint:js",
     "lint:sol": "solhint 'contracts/**/*.sol' 'test/**/*.sol'",
     "lint:js": "eslint . --cache --ignore-path .gitignore --ext=js",
-    "lint:mocha": "if [ -z \"`grep -r 'it.only(' ./test`\" ] && [ -z \"`grep -r 'contract.only(' ./test`\" ] && [ -z \"`grep -r 'describe.only(' ./test`\" ] && [ -z \"`grep -r \\\"describe.skip('oraclize live tests\\\" ./test`\" ]; then exit 0; else echo '\"it.only\" or \"describe.only\" or it looks like you are skipping the oraclize live tests in the mocha tests! You are not testing everything.' && exit 1; fi"
+    "lint:mocha": "if [ -z \"`grep -r 'it.only(' ./test`\" ] && [ -z \"`grep -r 'contract.only(' ./test`\" ] && [ -z \"`grep -r 'describe.only(' ./test`\" ] && [ -z \"`grep -r \\\"describe.skip('oraclize live tests\\\" ./test`\" ]; then exit 0; else echo '\"it.only\" or \"describe.only\" or it looks like you are skipping the oraclize live tests in the mocha tests! You are not testing everything.' && exit 1; fi",
+    "install": "npm rum build"
   },
   "repository": {
     "type": "git",
