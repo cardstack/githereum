@@ -7,7 +7,7 @@ replacement for centralized repository hosting such as github or gitlab.
 
 It consists of an ethereum smart contract and a cli for interacting with it.
 
-The contract allows administring and sharing repos, the state of which is tracked
+The contract allows administering and sharing repos, the state of which is tracked
 on-chain allowing setting owners and writers, allowing distributed control of
 who has access to a repository along with cryptographically guaranteeing that
 different users have the same view of the state of the repo.
